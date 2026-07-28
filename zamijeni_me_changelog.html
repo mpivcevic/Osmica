@@ -1021,6 +1021,17 @@
       body: "Three changes. (1) Replaced the generic post-login install modal for new waiters with a dedicated full-screen tutorial shown right after PIN setup (before entering the app) — shows a one-tap 'Instaliraj aplikaciju' button on Android when Chrome's beforeinstallprompt is ready, 3-step manual instructions on iOS, or a generic fallback otherwise. If the beforeinstallprompt event fires late (common on a brand-new visit, since the whole invite-to-PIN flow can complete before Chrome's install heuristics kick in), the screen now upgrades live from manual steps to the native button instead of being stuck with whatever was available at the first instant. Owner's existing post-login install modal is untouched. (2) Fixed the admin staff list never refreshing from the DB — switchTab('admin') only re-rendered STATE.waiters from memory, so a newly-activated waiter (build 4.21's joined_at fix) still showed 'Čeka aktivaciju' until the owner fully logged out and back in. Added refreshWaiters(), mirroring the existing refreshRequests() pattern, called on admin tab entry. (3) Converted icon-192 and icon-512 from SVG to PNG (manifest.json, manifest_b.json, both HTML files' apple-touch-icon link, and sw.js's static cache list) — iOS Safari does not support SVG for home-screen icons, only PNG/JPEG, which could have been silently breaking or degrading the install appearance on iPhone.",
       why: "Waiter reported the install-to-home-screen flow worked for the owner but not for a newly invited team member, and that the admin panel still showed a waiter as pending after they'd already completed PIN setup.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-23-install-tutorial-recover-path-fix",
+      phase: "build",
+      version: "Build 4.23",
+      versionDate: "29 Jul 2026",
+      tag: "fix",
+      title: "Install tutorial also shows on the 'existing PIN' invite path, not just first-time setup",
+      body: "Build 4.22's install tutorial was only wired into the first-time PIN setup branch of the invite flow (_inviteStep === 'confirm'). Any waiter whose joined_at was already set from an earlier visit lands on the 'recover' branch instead (verify existing PIN), which still called enterWaiterApp() directly, skipping the tutorial entirely. Extracted a shared proceedAfterWaiterAuth(session) that both branches now call — it shows the tutorial if the device hasn't seen it yet and isn't already running as an installed PWA, otherwise goes straight into the app.",
+      why: "Tester reused a team member invite that had already been activated earlier in testing, so it hit the untouched 'recover' path and went straight into the app with no tutorial shown.",
+      date: "29 Jul 2026"
     }
   ];
   </script>

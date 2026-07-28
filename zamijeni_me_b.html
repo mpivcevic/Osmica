@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.22</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.23</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1147,10 +1147,23 @@ function maybeShowInstallPrompt() {
 
 let _pendingWaiterSession = null;
 
+// Shared exit point for both invite-flow branches (first-time PIN setup AND
+// verifying an existing PIN on a new device) — whichever one a given waiter
+// hits, they still get the install tutorial once per device if they haven't
+// seen it yet. Gating this only on the 'setup' branch missed anyone whose
+// joined_at was already set from an earlier session (they land on 'recover'
+// instead), so they'd skip the tutorial entirely.
+function proceedAfterWaiterAuth(session) {
+  if (!isStandalonePWA() && !localStorage.getItem('zm_b_install_prompted')) {
+    showInstallTutorial(session);
+  } else {
+    enterWaiterApp(session);
+  }
+}
+
 function showInstallTutorial(session) {
   _pendingWaiterSession = session;
   localStorage.setItem('zm_b_install_prompted', '1'); // covers the generic post-login modal too, so it doesn't double up
-  if (isStandalonePWA()) { finishInstallTutorial(); return; }
   document.getElementById('install-tut-android').style.display = 'none';
   document.getElementById('install-tut-ios').style.display = 'none';
   document.getElementById('install-tut-generic').style.display = 'none';
@@ -1772,7 +1785,7 @@ async function handleInviteKey(k) {
     // Remove invite token from URL
     history.replaceState({}, '', location.pathname);
     showToast('PIN postavljen! Dobrodošli 👋');
-    showInstallTutorial(session);
+    proceedAfterWaiterAuth(session);
     return;
   }
 
@@ -1788,7 +1801,7 @@ async function handleInviteKey(k) {
       const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
       setWaiterSession(session);
       history.replaceState({}, '', location.pathname);
-      await enterWaiterApp(session);
+      proceedAfterWaiterAuth(session);
     } else {
       for (let i = 0; i < 4; i++) {
         const d = document.getElementById(`inv-dot-${i}`);
