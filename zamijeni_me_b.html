@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.24</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.25</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1147,12 +1147,14 @@ function maybeShowInstallPrompt() {
 
 let _pendingWaiterSession = null;
 
-// Shared exit point for both invite-flow branches (first-time PIN setup AND
-// verifying an existing PIN on a new device) — whichever one a given waiter
-// hits, they still get the install tutorial once per device if they haven't
-// seen it yet. Gating this only on the 'setup' branch missed anyone whose
-// joined_at was already set from an earlier session (they land on 'recover'
-// instead), so they'd skip the tutorial entirely.
+// Shared exit point for every way a waiter can successfully authenticate:
+// invite-flow first-time PIN setup, invite-flow existing-PIN recovery, the
+// regular returning-device login (handleLoginKey), and PIN-only mode
+// (handlePinOnlyKey). Whichever one fires, the tutorial shows once per
+// device if it hasn't been seen yet. In practice the invite flow only ever
+// runs once per waiter — every day-to-day login after that goes through
+// one of the other two paths, so gating only the invite flow meant the
+// tutorial would almost never actually show.
 function proceedAfterWaiterAuth(session) {
   if (!isStandalonePWA() && !localStorage.getItem('zm_b_waiter_install_prompted')) {
     showInstallTutorial(session);
@@ -1469,7 +1471,7 @@ async function handlePinOnlyKey(k) {
   if (waiter) {
     const session = { id: waiter.id, name: waiter.name, cafe_id: waiter.cafe_id, color: waiter.color || AVATAR_COLORS[0] };
     setWaiterSession(session);
-    await enterWaiterApp(session);
+    proceedAfterWaiterAuth(session);
   } else {
     const dotsEl = document.getElementById('pin-dots');
     for (let i = 0; i < 4; i++) { const d = document.getElementById(`dot-${i}`); if (d) d.classList.add('error'); }
@@ -1510,7 +1512,7 @@ async function handleLoginKey(k) {
     });
     _loginVerifying = false;
     if (ok) {
-      await enterWaiterApp(_loginWaiterSession);
+      proceedAfterWaiterAuth(_loginWaiterSession);
     } else {
       const dotsEl = document.getElementById('pin-dots');
       for (let i = 0; i < 4; i++) {

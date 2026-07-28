@@ -1043,6 +1043,17 @@
       body: "Both maybeShowInstallPrompt() (owner, post-login modal) and proceedAfterWaiterAuth()/showInstallTutorial() (waiter, dedicated screen) shared the same zm_b_install_prompted localStorage key. Testing both flows on the same phone/browser meant whichever ran first permanently suppressed the other. Waiter path now uses its own zm_b_waiter_install_prompted key.",
       why: "Owner and waiter installs were both being tested on the same device during this session, so the owner's earlier successful install test could silently suppress the waiter tutorial regardless of the recover-path fix in Build 4.23.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-25-install-tutorial-all-login-paths",
+      phase: "build",
+      version: "Build 4.25",
+      versionDate: "29 Jul 2026",
+      tag: "fix",
+      title: "Install tutorial now fires from every waiter login path, not just the invite flow",
+      body: "Build 4.23 routed both invite-flow branches through proceedAfterWaiterAuth(), but missed two other paths into enterWaiterApp(): handleLoginKey (the regular returning-device login used once a waiter session is already saved to localStorage) and handlePinOnlyKey (PIN-only mode, cafe known but no active session). In practice the invite flow only ever runs once per waiter — every day-to-day login afterward goes through one of these other two paths — so the tutorial would almost never actually show. Both now call proceedAfterWaiterAuth() too.",
+      why: "Tester's phone already had a saved waiter session from earlier testing, so reopening the app hit the regular login path instead of the invite flow, bypassing every install-tutorial fix made so far.",
+      date: "29 Jul 2026"
     }
   ];
   </script>
