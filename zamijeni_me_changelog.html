@@ -1032,6 +1032,17 @@
       body: "Build 4.22's install tutorial was only wired into the first-time PIN setup branch of the invite flow (_inviteStep === 'confirm'). Any waiter whose joined_at was already set from an earlier visit lands on the 'recover' branch instead (verify existing PIN), which still called enterWaiterApp() directly, skipping the tutorial entirely. Extracted a shared proceedAfterWaiterAuth(session) that both branches now call — it shows the tutorial if the device hasn't seen it yet and isn't already running as an installed PWA, otherwise goes straight into the app.",
       why: "Tester reused a team member invite that had already been activated earlier in testing, so it hit the untouched 'recover' path and went straight into the app with no tutorial shown.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-24-separate-install-prompt-flags",
+      phase: "build",
+      version: "Build 4.24",
+      versionDate: "29 Jul 2026",
+      tag: "fix",
+      title: "Separate localStorage flags for owner install nudge vs waiter install tutorial",
+      body: "Both maybeShowInstallPrompt() (owner, post-login modal) and proceedAfterWaiterAuth()/showInstallTutorial() (waiter, dedicated screen) shared the same zm_b_install_prompted localStorage key. Testing both flows on the same phone/browser meant whichever ran first permanently suppressed the other. Waiter path now uses its own zm_b_waiter_install_prompted key.",
+      why: "Owner and waiter installs were both being tested on the same device during this session, so the owner's earlier successful install test could silently suppress the waiter tutorial regardless of the recover-path fix in Build 4.23.",
+      date: "29 Jul 2026"
     }
   ];
   </script>

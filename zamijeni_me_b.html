@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.23</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.24</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1154,7 +1154,7 @@ let _pendingWaiterSession = null;
 // joined_at was already set from an earlier session (they land on 'recover'
 // instead), so they'd skip the tutorial entirely.
 function proceedAfterWaiterAuth(session) {
-  if (!isStandalonePWA() && !localStorage.getItem('zm_b_install_prompted')) {
+  if (!isStandalonePWA() && !localStorage.getItem('zm_b_waiter_install_prompted')) {
     showInstallTutorial(session);
   } else {
     enterWaiterApp(session);
@@ -1163,7 +1163,7 @@ function proceedAfterWaiterAuth(session) {
 
 function showInstallTutorial(session) {
   _pendingWaiterSession = session;
-  localStorage.setItem('zm_b_install_prompted', '1'); // covers the generic post-login modal too, so it doesn't double up
+  localStorage.setItem('zm_b_waiter_install_prompted', '1');
   document.getElementById('install-tut-android').style.display = 'none';
   document.getElementById('install-tut-ios').style.display = 'none';
   document.getElementById('install-tut-generic').style.display = 'none';
