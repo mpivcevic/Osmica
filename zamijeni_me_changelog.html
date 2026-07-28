@@ -988,6 +988,17 @@
       body: "Owner badge was counting open + pending_approval but missing cover_rejected — showing 2 when there were 3 active requests. Added cover_rejected to the badge filter. Extracted refreshRequests() helper that fetches fresh shift_requests from DB and calls renderSwaps() + updateBadges(). refreshRequests now called both on Zamjene tab enter AND on filter sub-tab switch (Otvorene/Moje/Na čekanju/Pokrivene), so the volunteer always gets fresh data when tapping Moje without needing to leave and re-enter the tab.",
       why: "Badge undercount caused by cover_rejected not being treated as an active request. Volunteer still saw stale status after owner rejected their cover because refresh only fired on tab entry, not on filter switch.",
       date: "30 Jun 2026"
+    },
+    {
+      id: "build-4-20-owner-password-reset",
+      phase: "build",
+      version: "Build 4.20",
+      versionDate: "28 Jul 2026",
+      tag: "feature",
+      title: "Owner forgot-password flow + fix recovery-link race condition",
+      body: "Added a full in-app password reset flow for the owner login: a 'Zaboravljena lozinka?' link on the login screen (hidden during registration) opens a forgot-password screen that calls sb.auth.resetPasswordForEmail(). The emailed link brings the owner back to a new-password screen, which calls sb.auth.updateUser({password}) and logs them straight in. Required one-time Supabase dashboard config (Authentication > URL Configuration) to allow-list the redirect URL. Also fixed a race condition discovered during testing: init() called sb.auth.getSession() and treated any session as a normal login, including the temporary session Supabase creates when a recovery link is clicked — so owners landed straight in the dashboard with no way to set a new password. Fix: the PASSWORD_RECOVERY auth event now sets a _passwordRecoveryPending flag, checked right after getSession() resolves (guaranteed to run after the event fires, since both stem from the same internal init sequence), which skips the owner-app entry and leaves the reset screen in place. Also cleans up the URL after a successful reset so a refresh doesn't re-trigger recovery mode with stale tokens.",
+      why: "Owner had no way to recover a forgotten password without going into the Supabase dashboard directly. First implementation attempt tried detecting the recovery link by reading location.hash/query params directly in init(), but Supabase can strip those from the URL as part of its own internal session setup before the app's own check runs — so that approach silently failed and let the recovery session fall through to the normal login path.",
+      date: "28 Jul 2026"
     }
   ];
   </script>

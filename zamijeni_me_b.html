@@ -599,6 +599,9 @@ details[open] .hours-chevron::before{content:'▴';}
     <label class="form-label">Lozinka</label>
     <input class="form-input" id="auth-password" type="password" placeholder="Minimalno 6 znakova" autocomplete="current-password"/>
     <button class="btn-primary" id="btn-auth-submit" style="margin-top:4px;">Prijavi se</button>
+    <div class="auth-link" id="auth-forgot-wrap">
+      <button id="btn-forgot-password">Zaboravljena lozinka?</button>
+    </div>
     <div class="auth-link">
       <span id="auth-toggle-text">Nemaš račun?</span>
       <button id="btn-auth-toggle">Registriraj se</button>
@@ -606,6 +609,37 @@ details[open] .hours-chevron::before{content:'▴';}
     <div class="auth-back" style="justify-content:center;margin-top:16px;margin-bottom:0;">
       <button id="btn-back-to-login">← Nazad na prijavu radnika</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════ FORGOT PASSWORD ══════════════ -->
+<div id="screen-forgot-password" class="screen">
+  <div class="auth-card">
+    <div class="auth-logo">Zamijeni<span>Me</span></div>
+    <div class="auth-title">Zaboravljena lozinka</div>
+    <p class="auth-tagline">Upiši email i poslat ćemo ti poveznicu za resetiranje lozinke.</p>
+    <div class="auth-error" id="forgot-error"></div>
+    <label class="form-label">Email</label>
+    <input class="form-input" id="forgot-email" type="email" placeholder="tvoj@email.com" autocomplete="email"/>
+    <button class="btn-primary" id="btn-forgot-submit" style="margin-top:4px;">Pošalji poveznicu</button>
+    <div class="auth-back" style="justify-content:center;margin-top:16px;margin-bottom:0;">
+      <button id="btn-forgot-back">← Nazad na prijavu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ RESET PASSWORD (from email link) ══════════════ -->
+<div id="screen-reset-password" class="screen">
+  <div class="auth-card">
+    <div class="auth-logo">Zamijeni<span>Me</span></div>
+    <div class="auth-title">Nova lozinka</div>
+    <p class="auth-tagline">Upiši novu lozinku za svoj račun.</p>
+    <div class="auth-error" id="reset-error"></div>
+    <label class="form-label">Nova lozinka</label>
+    <input class="form-input" id="reset-password" type="password" placeholder="Minimalno 6 znakova" autocomplete="new-password"/>
+    <label class="form-label">Potvrdi lozinku</label>
+    <input class="form-input" id="reset-password-confirm" type="password" placeholder="Ponovi lozinku" autocomplete="new-password"/>
+    <button class="btn-primary" id="btn-reset-submit" style="margin-top:4px;">Spremi novu lozinku</button>
   </div>
 </div>
 
@@ -1140,8 +1174,30 @@ async function init() {
     return;
   }
 
-  // 2. Owner session (Supabase Auth)
+  // 2. Password recovery link (Supabase Auth) — must be checked before the
+  // session check below, since clicking the reset-email link establishes a
+  // real session too. Without this, step 3 would treat it as a normal login
+  // and drop the user straight into the owner app, skipping the reset screen.
+  const isRecovery = location.hash.includes('type=recovery') || params.get('type') === 'recovery';
+  if (isRecovery) {
+    document.getElementById('reset-password').value = '';
+    document.getElementById('reset-password-confirm').value = '';
+    document.getElementById('reset-error').textContent = '';
+    showScreen('screen-reset-password');
+    return;
+  }
+
+  // 3. Owner session (Supabase Auth)
   const { data: { session } } = await sb.auth.getSession();
+  // getSession() awaits Supabase's internal init sequence, which is also what
+  // fires PASSWORD_RECOVERY — so by now that event (and its screen-show) has
+  // already happened if this was a recovery link. Supabase can strip the
+  // token from the URL before our own check above runs, so this flag (set by
+  // the event itself, not by re-parsing the URL) is the reliable signal.
+  // Don't let a recovery session get treated as a normal login.
+  if (_passwordRecoveryPending) {
+    return;
+  }
   if (session) {
     await enterOwnerApp(session.user);
     return;
@@ -1346,6 +1402,7 @@ async function handleLoginKey(k) {
 // OWNER AUTH SCREEN
 // ══════════════════════════════════════════════════════════
 let _authMode = 'login'; // 'login' | 'register'
+let _passwordRecoveryPending = false;
 let _pendingSignupUser = null; // stored when email confirmation is required
 
 function setupOwnerAuthScreen() {
@@ -1357,6 +1414,56 @@ function setupOwnerAuthScreen() {
   document.getElementById('auth-error').textContent = '';
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
+  document.getElementById('auth-forgot-wrap').style.display = '';
+}
+
+async function handleForgotPasswordOpen() {
+  document.getElementById('forgot-error').textContent = '';
+  document.getElementById('forgot-email').value = document.getElementById('auth-email').value.trim();
+  showScreen('screen-forgot-password');
+}
+
+async function handleForgotPasswordSubmit() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const errEl = document.getElementById('forgot-error');
+  const btn = document.getElementById('btn-forgot-submit');
+  if (!email) { errEl.textContent = 'Upiši email.'; return; }
+  btn.disabled = true;
+  btn.textContent = '...';
+  errEl.textContent = '';
+  const redirectTo = location.origin + location.pathname;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  btn.disabled = false;
+  btn.textContent = 'Pošalji poveznicu';
+  if (error) {
+    errEl.textContent = error.message || 'Greška. Pokušaj ponovo.';
+    return;
+  }
+  showScreen('screen-owner-auth');
+  setupOwnerAuthScreen();
+  showToast('Provjeri email — poslali smo ti poveznicu za resetiranje lozinke.');
+}
+
+async function handleResetPasswordSubmit() {
+  const pw = document.getElementById('reset-password').value;
+  const pwConfirm = document.getElementById('reset-password-confirm').value;
+  const errEl = document.getElementById('reset-error');
+  const btn = document.getElementById('btn-reset-submit');
+  if (!pw || pw.length < 6) { errEl.textContent = 'Lozinka mora imati barem 6 znakova.'; return; }
+  if (pw !== pwConfirm) { errEl.textContent = 'Lozinke se ne podudaraju.'; return; }
+  btn.disabled = true;
+  btn.textContent = '...';
+  errEl.textContent = '';
+  const { data, error } = await sb.auth.updateUser({ password: pw });
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'Spremi novu lozinku';
+    errEl.textContent = error.message || 'Greška pri spremanju lozinke.';
+    return;
+  }
+  history.replaceState(null, '', location.pathname);
+  showToast('Lozinka spremljena.');
+  await enterOwnerApp(data.user);
 }
 
 async function handleAuthSubmit() {
@@ -2873,6 +2980,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-auth-toggle').textContent = _authMode==='login'?'Registriraj se':'Prijavi se';
     document.getElementById('btn-auth-submit').textContent = _authMode==='login'?'Prijavi se':'Registriraj se';
     document.getElementById('auth-error').textContent='';
+    document.getElementById('auth-forgot-wrap').style.display = _authMode==='login'?'':'none';
   });
   document.getElementById('btn-back-to-login').addEventListener('click', () => {
     const ws=getWaiterSession();
@@ -2880,6 +2988,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ws) setupWaiterLoginScreen(ws);
     else setupLoginNoSession();
   });
+
+  // Forgot / reset password
+  document.getElementById('btn-forgot-password').addEventListener('click', handleForgotPasswordOpen);
+  document.getElementById('btn-forgot-back').addEventListener('click', () => { showScreen('screen-owner-auth'); setupOwnerAuthScreen(); });
+  document.getElementById('btn-forgot-submit').addEventListener('click', handleForgotPasswordSubmit);
+  document.getElementById('forgot-email').addEventListener('keydown', e=>{if(e.key==='Enter') handleForgotPasswordSubmit();});
+  document.getElementById('reset-password').addEventListener('keydown', e=>{if(e.key==='Enter') document.getElementById('reset-password-confirm').focus();});
+  document.getElementById('reset-password-confirm').addEventListener('keydown', e=>{if(e.key==='Enter') handleResetPasswordSubmit();});
+  document.getElementById('btn-reset-submit').addEventListener('click', handleResetPasswordSubmit);
 
   // Cafe setup
   document.getElementById('btn-setup-save').addEventListener('click', handleCafeSetup);
@@ -2996,6 +3113,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   sb.auth.onAuthStateChange((event, session) => {
     if (event==='SIGNED_OUT' && STATE.currentUser==='owner') {
       logout();
+    }
+    if (event==='PASSWORD_RECOVERY') {
+      _passwordRecoveryPending = true;
+      document.getElementById('reset-password').value='';
+      document.getElementById('reset-password-confirm').value='';
+      document.getElementById('reset-error').textContent='';
+      showScreen('screen-reset-password');
     }
   });
 
