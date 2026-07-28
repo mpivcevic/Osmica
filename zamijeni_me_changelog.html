@@ -999,6 +999,17 @@
       body: "Added a full in-app password reset flow for the owner login: a 'Zaboravljena lozinka?' link on the login screen (hidden during registration) opens a forgot-password screen that calls sb.auth.resetPasswordForEmail(). The emailed link brings the owner back to a new-password screen, which calls sb.auth.updateUser({password}) and logs them straight in. Required one-time Supabase dashboard config (Authentication > URL Configuration) to allow-list the redirect URL. Also fixed a race condition discovered during testing: init() called sb.auth.getSession() and treated any session as a normal login, including the temporary session Supabase creates when a recovery link is clicked — so owners landed straight in the dashboard with no way to set a new password. Fix: the PASSWORD_RECOVERY auth event now sets a _passwordRecoveryPending flag, checked right after getSession() resolves (guaranteed to run after the event fires, since both stem from the same internal init sequence), which skips the owner-app entry and leaves the reset screen in place. Also cleans up the URL after a successful reset so a refresh doesn't re-trigger recovery mode with stale tokens.",
       why: "Owner had no way to recover a forgotten password without going into the Supabase dashboard directly. First implementation attempt tried detecting the recovery link by reading location.hash/query params directly in init(), but Supabase can strip those from the URL as part of its own internal session setup before the app's own check runs — so that approach silently failed and let the recovery session fall through to the normal login path.",
       date: "28 Jul 2026"
+    },
+    {
+      id: "build-4-21-install-prompt-and-pin-reset-fix",
+      phase: "build",
+      version: "Build 4.21",
+      versionDate: "29 Jul 2026",
+      tag: "fix",
+      title: "Add-to-home-screen prompt + fix PIN being resettable via old invite link",
+      body: "Two fixes found during manual testing of the waiter invite flow. (1) Nothing in the app ever guided a new user to install it to their home screen — added a one-time modal after first entering the app (skipped if already running standalone) that shows a native 'Instaliraj aplikaciju' button when the browser fires beforeinstallprompt (Android/Chrome), manual share-sheet steps on iOS, or a generic menu instruction as a fallback for anything else. Deferred until after the owner's first-run onboarding to avoid stacking two overlays on the very first session. (2) Revisiting an already-used invite link let a waiter set a brand-new PIN again, overwriting the old one — handleInviteLoad decides setup-vs-recover by checking waiters.joined_at, but the client never actually set that column after a successful set_waiter_pin call, so it stayed permanently null and every visit looked like a first-time signup.",
+      why: "Builder tested the invite flow personally: after registering as a waiter, found no way to add the app to the home screen, and noticed clicking the same invite link again re-opened PIN setup instead of asking for the existing PIN.",
+      date: "29 Jul 2026"
     }
   ];
   </script>

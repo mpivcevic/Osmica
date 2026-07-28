@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.20</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.21</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1038,6 +1038,27 @@ details[open] .hours-chevron::before{content:'▴';}
   </div>
 </div>
 
+<!-- ══════════════ INSTALL TO HOME SCREEN ══════════════ -->
+<div class="modal-overlay" id="modal-install">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Spremi aplikaciju na početni zaslon</div>
+    <p class="modal-sub" style="margin-bottom:16px;">Otvaraj ZamijeniMe kao pravu aplikaciju — brže i bez adresne trake.</p>
+    <div id="install-steps-android" style="display:none;">
+      <button class="btn-primary" id="btn-install-android">Instaliraj aplikaciju</button>
+    </div>
+    <div id="install-steps-ios" style="display:none;font-size:14px;line-height:1.6;color:var(--text-2);margin-bottom:8px;">
+      1. Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
+      2. Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
+      3. Dodirni <strong>Dodaj</strong>
+    </div>
+    <div id="install-steps-generic" style="display:none;font-size:14px;line-height:1.6;color:var(--text-2);margin-bottom:8px;">
+      Otvori izbornik preglednika (obično ⋮ ili ≡) i odaberi <strong>"Dodaj na početni zaslon"</strong> ili <strong>"Instaliraj aplikaciju"</strong>.
+    </div>
+    <button class="btn-secondary" id="btn-install-dismiss" style="margin-top:8px;">Sakrij</button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -1058,6 +1079,40 @@ const DAY_LABELS_FULL = ["Ponedjeljak","Utorak","Srijeda","Četvrtak","Petak","S
 const MONTH_NAMES = ["Siječanj","Veljača","Ožujak","Travanj","Svibanj","Lipanj","Srpanj","Kolovoz","Rujan","Listopad","Studeni","Prosinac"];
 const AVATAR_COLORS = ["#2563eb","#7c3aed","#db2777","#059669","#d97706","#dc2626","#0891b2"];
 const WAITER_SESSION_KEY = 'zm_b_waiter';
+
+// ══════════════════════════════════════════════════════════
+// ADD-TO-HOME-SCREEN
+// ══════════════════════════════════════════════════════════
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+});
+
+function isStandalonePWA() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function isIOSDevice() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+
+function maybeShowInstallPrompt() {
+  if (isStandalonePWA()) return;
+  if (localStorage.getItem('zm_b_install_prompted')) return;
+  localStorage.setItem('zm_b_install_prompted', '1');
+  document.getElementById('install-steps-android').style.display = 'none';
+  document.getElementById('install-steps-ios').style.display = 'none';
+  document.getElementById('install-steps-generic').style.display = 'none';
+  if (_deferredInstallPrompt) {
+    document.getElementById('install-steps-android').style.display = 'block';
+  } else if (isIOSDevice()) {
+    document.getElementById('install-steps-ios').style.display = 'block';
+  } else {
+    document.getElementById('install-steps-generic').style.display = 'block';
+  }
+  document.getElementById('modal-install').classList.add('open');
+}
 
 const ONBOARDING_STEPS = [
   {icon:'👋',title:'Dobrodošli u ZamijeniMe',body:'Kratki vodič kroz upravljačke funkcije.'},
@@ -1274,10 +1329,12 @@ function enterMainApp() {
   if (legendEl) legendEl.style.display = ownerUser ? 'none' : 'grid';
   switchTab('home');
   updateBadges();
+  let onboardingShown = false;
   if (ownerUser) {
     const obKey = 'zm_b_ob_done';
-    try { if (!localStorage.getItem(obKey)) { startOnboarding(); localStorage.setItem(obKey,'1'); } } catch {}
+    try { if (!localStorage.getItem(obKey)) { startOnboarding(); localStorage.setItem(obKey,'1'); onboardingShown = true; } } catch {}
   }
+  if (!onboardingShown) maybeShowInstallPrompt();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1652,6 +1709,7 @@ async function handleInviteKey(k) {
       document.getElementById('invite-instruction').textContent = 'Postavi 4-znamenkasti PIN za prijavu.';
       renderInviteDots([]); return;
     }
+    await sb.from('waiters').update({ joined_at: new Date().toISOString() }).eq('id', _inviteWaiter.id);
     localStorage.setItem('zm_b_cafe_id', _inviteWaiter.cafe_id);
     const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
     setWaiterSession(session);
@@ -3092,6 +3150,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-save-owner-profile').addEventListener('click', saveOwnerProfile);
   document.getElementById('btn-cancel-owner-profile').addEventListener('click', closeOwnerProfileModal);
 
+  // Add to home screen
+  document.getElementById('btn-install-dismiss').addEventListener('click', () => {
+    document.getElementById('modal-install').classList.remove('open');
+  });
+  document.getElementById('btn-install-android').addEventListener('click', async () => {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    document.getElementById('modal-install').classList.remove('open');
+  });
+
   // Onboarding
   document.getElementById('ob-next').addEventListener('click', ()=>{
     obStep++;
@@ -3101,7 +3171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('ob-skip').addEventListener('click', closeOnboarding);
 
   // Close modals on overlay click
-  ['modal-request','modal-day-detail','modal-owner-profile','modal-sunday-settings'].forEach(id=>{
+  ['modal-request','modal-day-detail','modal-owner-profile','modal-sunday-settings','modal-install'].forEach(id=>{
     const overlay=document.getElementById(id);
     if (!overlay) return;
     overlay.addEventListener('click', e=>{if(e.target===overlay) overlay.classList.remove('open');});
