@@ -1010,6 +1010,17 @@
       body: "Two fixes found during manual testing of the waiter invite flow. (1) Nothing in the app ever guided a new user to install it to their home screen — added a one-time modal after first entering the app (skipped if already running standalone) that shows a native 'Instaliraj aplikaciju' button when the browser fires beforeinstallprompt (Android/Chrome), manual share-sheet steps on iOS, or a generic menu instruction as a fallback for anything else. Deferred until after the owner's first-run onboarding to avoid stacking two overlays on the very first session. (2) Revisiting an already-used invite link let a waiter set a brand-new PIN again, overwriting the old one — handleInviteLoad decides setup-vs-recover by checking waiters.joined_at, but the client never actually set that column after a successful set_waiter_pin call, so it stayed permanently null and every visit looked like a first-time signup.",
       why: "Builder tested the invite flow personally: after registering as a waiter, found no way to add the app to the home screen, and noticed clicking the same invite link again re-opened PIN setup instead of asking for the existing PIN.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-22-install-tutorial-and-png-icons",
+      phase: "build",
+      version: "Build 4.22",
+      versionDate: "29 Jul 2026",
+      tag: "fix",
+      title: "Dedicated install-tutorial screen for new waiters + admin refresh fix + PNG icons",
+      body: "Three changes. (1) Replaced the generic post-login install modal for new waiters with a dedicated full-screen tutorial shown right after PIN setup (before entering the app) — shows a one-tap 'Instaliraj aplikaciju' button on Android when Chrome's beforeinstallprompt is ready, 3-step manual instructions on iOS, or a generic fallback otherwise. If the beforeinstallprompt event fires late (common on a brand-new visit, since the whole invite-to-PIN flow can complete before Chrome's install heuristics kick in), the screen now upgrades live from manual steps to the native button instead of being stuck with whatever was available at the first instant. Owner's existing post-login install modal is untouched. (2) Fixed the admin staff list never refreshing from the DB — switchTab('admin') only re-rendered STATE.waiters from memory, so a newly-activated waiter (build 4.21's joined_at fix) still showed 'Čeka aktivaciju' until the owner fully logged out and back in. Added refreshWaiters(), mirroring the existing refreshRequests() pattern, called on admin tab entry. (3) Converted icon-192 and icon-512 from SVG to PNG (manifest.json, manifest_b.json, both HTML files' apple-touch-icon link, and sw.js's static cache list) — iOS Safari does not support SVG for home-screen icons, only PNG/JPEG, which could have been silently breaking or degrading the install appearance on iPhone.",
+      why: "Waiter reported the install-to-home-screen flow worked for the owner but not for a newly invited team member, and that the admin panel still showed a waiter as pending after they'd already completed PIN setup.",
+      date: "29 Jul 2026"
     }
   ];
   </script>

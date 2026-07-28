@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#2563eb"/>
 <link rel="manifest" href="manifest_b.json"/>
-<link rel="apple-touch-icon" href="icon-192.svg"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <title>ZamijeniMe</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.21</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.22</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -700,6 +700,28 @@ details[open] .hours-chevron::before{content:'▴';}
         <button class="key key-del" data-key="del">⌫</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════ INSTALL TUTORIAL (waiter onboarding, after PIN setup) ══════════════ -->
+<div id="screen-install-tutorial" class="screen">
+  <div class="invite-card">
+    <div class="invite-logo">Zamijeni<span>Me</span></div>
+    <div style="font-size:40px;text-align:center;margin:8px 0 4px;">📲</div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);text-align:center;margin-bottom:6px;">Zadnji korak</div>
+    <p style="font-size:14px;color:var(--text-2);text-align:center;margin-bottom:20px;">Spremi ZamijeniMe na početni zaslon — otvara se kao prava aplikacija, bez preglednika.</p>
+    <div id="install-tut-android" style="display:none;text-align:center;">
+      <button class="btn-primary" id="btn-install-tut-android">Instaliraj aplikaciju</button>
+    </div>
+    <div id="install-tut-ios" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:8px;">
+      <strong>1.</strong> Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
+      <strong>2.</strong> Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
+      <strong>3.</strong> Dodirni <strong>Dodaj</strong>
+    </div>
+    <div id="install-tut-generic" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:8px;">
+      Otvori izbornik preglednika (obično ⋮ ili ≡) i odaberi <strong>"Dodaj na početni zaslon"</strong> ili <strong>"Instaliraj aplikaciju"</strong>.
+    </div>
+    <button class="btn-secondary" id="btn-install-tutorial-continue" style="margin-top:16px;">Nastavi u aplikaciju →</button>
   </div>
 </div>
 
@@ -1087,6 +1109,15 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
+  // The event can arrive after the install-tutorial screen is already showing
+  // (it doesn't always fire immediately on a brand-new visit) — if so, swap
+  // in the native one-tap button instead of leaving the manual/generic steps up.
+  const tutScreen = document.getElementById('screen-install-tutorial');
+  if (tutScreen && tutScreen.classList.contains('active')) {
+    document.getElementById('install-tut-android').style.display = 'block';
+    document.getElementById('install-tut-ios').style.display = 'none';
+    document.getElementById('install-tut-generic').style.display = 'none';
+  }
 });
 
 function isStandalonePWA() {
@@ -1112,6 +1143,31 @@ function maybeShowInstallPrompt() {
     document.getElementById('install-steps-generic').style.display = 'block';
   }
   document.getElementById('modal-install').classList.add('open');
+}
+
+let _pendingWaiterSession = null;
+
+function showInstallTutorial(session) {
+  _pendingWaiterSession = session;
+  localStorage.setItem('zm_b_install_prompted', '1'); // covers the generic post-login modal too, so it doesn't double up
+  if (isStandalonePWA()) { finishInstallTutorial(); return; }
+  document.getElementById('install-tut-android').style.display = 'none';
+  document.getElementById('install-tut-ios').style.display = 'none';
+  document.getElementById('install-tut-generic').style.display = 'none';
+  if (_deferredInstallPrompt) {
+    document.getElementById('install-tut-android').style.display = 'block';
+  } else if (isIOSDevice()) {
+    document.getElementById('install-tut-ios').style.display = 'block';
+  } else {
+    document.getElementById('install-tut-generic').style.display = 'block';
+  }
+  showScreen('screen-install-tutorial');
+}
+
+async function finishInstallTutorial() {
+  const session = _pendingWaiterSession;
+  _pendingWaiterSession = null;
+  await enterWaiterApp(session);
 }
 
 const ONBOARDING_STEPS = [
@@ -1716,7 +1772,7 @@ async function handleInviteKey(k) {
     // Remove invite token from URL
     history.replaceState({}, '', location.pathname);
     showToast('PIN postavljen! Dobrodošli 👋');
-    await enterWaiterApp(session);
+    showInstallTutorial(session);
     return;
   }
 
@@ -1888,7 +1944,13 @@ function switchTab(tab, dir) {
   if (tab === 'swaps') { renderSwaps(); refreshRequests(); }
   if (tab === 'week') renderWeekView();
   if (tab === 'month') renderMonthView();
-  if (tab === 'admin') renderAdmin();
+  if (tab === 'admin') { renderAdmin(); refreshWaiters(); }
+}
+
+function refreshWaiters() {
+  if (!STATE.cafe?.id) return;
+  sb.from('waiters').select('*').eq('cafe_id', STATE.cafe.id).order('created_at')
+    .then(({ data }) => { if (data) { STATE.waiters = data.map(mapWaiter); renderAdminStaff(); } });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3160,6 +3222,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
     document.getElementById('modal-install').classList.remove('open');
+  });
+
+  // Install tutorial (waiter, after PIN setup)
+  document.getElementById('btn-install-tutorial-continue').addEventListener('click', finishInstallTutorial);
+  document.getElementById('btn-install-tut-android').addEventListener('click', async () => {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    await finishInstallTutorial();
   });
 
   // Onboarding
