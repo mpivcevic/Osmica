@@ -1054,6 +1054,17 @@
       body: "Build 4.23 routed both invite-flow branches through proceedAfterWaiterAuth(), but missed two other paths into enterWaiterApp(): handleLoginKey (the regular returning-device login used once a waiter session is already saved to localStorage) and handlePinOnlyKey (PIN-only mode, cafe known but no active session). In practice the invite flow only ever runs once per waiter — every day-to-day login afterward goes through one of these other two paths — so the tutorial would almost never actually show. Both now call proceedAfterWaiterAuth() too.",
       why: "Tester's phone already had a saved waiter session from earlier testing, so reopening the app hit the regular login path instead of the invite flow, bypassing every install-tutorial fix made so far.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-26-install-tutorial-carousel",
+      phase: "build",
+      version: "Build 4.26",
+      versionDate: "29 Jul 2026",
+      tag: "ui",
+      title: "Install tutorial rebuilt as a 3-card swipeable carousel + honest copy",
+      body: "The install-tutorial was a single screen with one line of text above the install action — functionally correct but didn't read as a tutorial. Rebuilt using the same overlay/card pattern as the owner's onboarding walkthrough: card 1 explains this is a real app (not a lesser version — just not downloaded from an app store), card 2 explains the benefit (opens from the home screen, no browser chrome), card 3 is the actual install action (native Android button, iOS steps, or generic fallback, same logic as before). Also corrected the wording everywhere it appeared ('otvara se kao prava aplikacija' / opens like a real app) to state plainly that it is a real app, just distributed differently — the old phrasing undersold it and read as if the app were a lesser imitation.",
+      why: "Builder tested the flow after fixing all four login-path gaps and found the install button worked but there was no actual tutorial content around it, and separately flagged that saying the app 'acts like a real app' was inaccurate and undermined confidence in something that is, in fact, a fully real application.",
+      date: "29 Jul 2026"
     }
   ];
   </script>

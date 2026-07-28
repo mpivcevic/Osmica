@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.25</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.26</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -704,24 +704,32 @@ details[open] .hours-chevron::before{content:'▴';}
 </div>
 
 <!-- ══════════════ INSTALL TUTORIAL (waiter onboarding, after PIN setup) ══════════════ -->
-<div id="screen-install-tutorial" class="screen">
-  <div class="invite-card">
-    <div class="invite-logo">Zamijeni<span>Me</span></div>
-    <div style="font-size:40px;text-align:center;margin:8px 0 4px;">📲</div>
-    <div style="font-size:16px;font-weight:600;color:var(--text);text-align:center;margin-bottom:6px;">Zadnji korak</div>
-    <p style="font-size:14px;color:var(--text-2);text-align:center;margin-bottom:20px;">Spremi ZamijeniMe na početni zaslon — otvara se kao prava aplikacija, bez preglednika.</p>
-    <div id="install-tut-android" style="display:none;text-align:center;">
-      <button class="btn-primary" id="btn-install-tut-android">Instaliraj aplikaciju</button>
+<div class="ob-overlay" id="install-tut-overlay">
+  <button class="ob-skip" id="install-tut-skip">Preskoči</button>
+  <div class="ob-card">
+    <div class="ob-dots" id="install-tut-dots"></div>
+    <div id="install-tut-step-info">
+      <div class="ob-icon" id="install-tut-icon"></div>
+      <div class="ob-title" id="install-tut-title"></div>
+      <div class="ob-body" id="install-tut-body"></div>
     </div>
-    <div id="install-tut-ios" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:8px;">
-      <strong>1.</strong> Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
-      <strong>2.</strong> Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
-      <strong>3.</strong> Dodirni <strong>Dodaj</strong>
+    <div id="install-tut-step-action" style="display:none;">
+      <div class="ob-icon">📲</div>
+      <div class="ob-title">Instaliraj sada</div>
+      <div class="ob-body">Zadnji korak — spremi ZamijeniMe na početni zaslon.</div>
+      <div id="install-tut-android" style="display:none;text-align:center;margin-bottom:16px;">
+        <button class="btn-primary" id="btn-install-tut-android" style="width:100%;">Instaliraj aplikaciju</button>
+      </div>
+      <div id="install-tut-ios" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:16px;text-align:left;">
+        <strong>1.</strong> Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
+        <strong>2.</strong> Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
+        <strong>3.</strong> Dodirni <strong>Dodaj</strong>
+      </div>
+      <div id="install-tut-generic" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:16px;text-align:left;">
+        Otvori izbornik preglednika (obično ⋮ ili ≡) i odaberi <strong>"Dodaj na početni zaslon"</strong> ili <strong>"Instaliraj aplikaciju"</strong>.
+      </div>
     </div>
-    <div id="install-tut-generic" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:8px;">
-      Otvori izbornik preglednika (obično ⋮ ili ≡) i odaberi <strong>"Dodaj na početni zaslon"</strong> ili <strong>"Instaliraj aplikaciju"</strong>.
-    </div>
-    <button class="btn-secondary" id="btn-install-tutorial-continue" style="margin-top:16px;">Nastavi u aplikaciju →</button>
+    <button class="ob-next" id="install-tut-next"></button>
   </div>
 </div>
 
@@ -1065,7 +1073,7 @@ details[open] .hours-chevron::before{content:'▴';}
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">Spremi aplikaciju na početni zaslon</div>
-    <p class="modal-sub" style="margin-bottom:16px;">Otvaraj ZamijeniMe kao pravu aplikaciju — brže i bez adresne trake.</p>
+    <p class="modal-sub" style="margin-bottom:16px;">Ovo je prava aplikacija — samo je nisi preuzeo/la s trgovine aplikacija. Spremi je na početni zaslon za brži pristup, bez adresne trake.</p>
     <div id="install-steps-android" style="display:none;">
       <button class="btn-primary" id="btn-install-android">Instaliraj aplikaciju</button>
     </div>
@@ -1109,11 +1117,12 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  // The event can arrive after the install-tutorial screen is already showing
-  // (it doesn't always fire immediately on a brand-new visit) — if so, swap
-  // in the native one-tap button instead of leaving the manual/generic steps up.
-  const tutScreen = document.getElementById('screen-install-tutorial');
-  if (tutScreen && tutScreen.classList.contains('active')) {
+  // The event can arrive after the install-tutorial overlay is already showing
+  // (it doesn't always fire immediately on a brand-new visit) — if so, and the
+  // final action step is the one currently displayed, swap in the native
+  // one-tap button instead of leaving the manual/generic steps up.
+  const tutOverlay = document.getElementById('install-tut-overlay');
+  if (tutOverlay && tutOverlay.classList.contains('open') && document.getElementById('install-tut-step-action').style.display !== 'none') {
     document.getElementById('install-tut-android').style.display = 'block';
     document.getElementById('install-tut-ios').style.display = 'none';
     document.getElementById('install-tut-generic').style.display = 'none';
@@ -1163,9 +1172,39 @@ function proceedAfterWaiterAuth(session) {
   }
 }
 
+const INSTALL_TUT_STEPS = [
+  {icon:'👋', title:'Ovo je prava aplikacija', body:'Samo je nisi preuzeo/la s trgovine aplikacija (Play Store ili App Store) — instalira se izravno, ali radi kao svaka druga aplikacija na tvom telefonu.'},
+  {icon:'⚡', title:'Brže, bez preglednika', body:'Otvara se s ikone na početnom zaslonu — bez adresne trake, brže učitavanje.'},
+];
+let _installTutStep = 0;
+
 function showInstallTutorial(session) {
   _pendingWaiterSession = session;
   localStorage.setItem('zm_b_waiter_install_prompted', '1');
+  _installTutStep = 0;
+  renderInstallTutStep();
+  document.getElementById('install-tut-overlay').classList.add('open');
+}
+
+function renderInstallTutStep() {
+  const totalSteps = INSTALL_TUT_STEPS.length + 1; // +1 for the final install-action step
+  document.getElementById('install-tut-dots').innerHTML = Array.from({length: totalSteps}, (_, i) =>
+    `<div class="ob-dot${i === _installTutStep ? ' active' : ''}"></div>`
+  ).join('');
+
+  if (_installTutStep < INSTALL_TUT_STEPS.length) {
+    const s = INSTALL_TUT_STEPS[_installTutStep];
+    document.getElementById('install-tut-step-info').style.display = 'block';
+    document.getElementById('install-tut-step-action').style.display = 'none';
+    document.getElementById('install-tut-icon').textContent = s.icon;
+    document.getElementById('install-tut-title').textContent = s.title;
+    document.getElementById('install-tut-body').textContent = s.body;
+    document.getElementById('install-tut-next').textContent = 'Dalje →';
+    return;
+  }
+
+  document.getElementById('install-tut-step-info').style.display = 'none';
+  document.getElementById('install-tut-step-action').style.display = 'block';
   document.getElementById('install-tut-android').style.display = 'none';
   document.getElementById('install-tut-ios').style.display = 'none';
   document.getElementById('install-tut-generic').style.display = 'none';
@@ -1176,7 +1215,12 @@ function showInstallTutorial(session) {
   } else {
     document.getElementById('install-tut-generic').style.display = 'block';
   }
-  showScreen('screen-install-tutorial');
+  document.getElementById('install-tut-next').textContent = 'Nastavi u aplikaciju →';
+}
+
+function closeInstallTutorial() {
+  document.getElementById('install-tut-overlay').classList.remove('open');
+  finishInstallTutorial();
 }
 
 async function finishInstallTutorial() {
@@ -3240,13 +3284,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Install tutorial (waiter, after PIN setup)
-  document.getElementById('btn-install-tutorial-continue').addEventListener('click', finishInstallTutorial);
+  document.getElementById('install-tut-skip').addEventListener('click', closeInstallTutorial);
+  document.getElementById('install-tut-next').addEventListener('click', () => {
+    if (_installTutStep < INSTALL_TUT_STEPS.length) {
+      _installTutStep++;
+      renderInstallTutStep();
+    } else {
+      closeInstallTutorial();
+    }
+  });
   document.getElementById('btn-install-tut-android').addEventListener('click', async () => {
     if (!_deferredInstallPrompt) return;
     _deferredInstallPrompt.prompt();
     await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
-    await finishInstallTutorial();
+    closeInstallTutorial();
   });
 
   // Onboarding
