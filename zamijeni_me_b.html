@@ -547,7 +547,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo">Zamijeni<span>Me</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.26</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.27</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -703,33 +703,18 @@ details[open] .hours-chevron::before{content:'▴';}
   </div>
 </div>
 
-<!-- ══════════════ INSTALL TUTORIAL (waiter onboarding, after PIN setup) ══════════════ -->
-<div class="ob-overlay" id="install-tut-overlay">
-  <button class="ob-skip" id="install-tut-skip">Preskoči</button>
+<!-- ══════════════ WAITER APP GUIDE (single card, shown once after first login) ══════════════ -->
+<div class="ob-overlay" id="waiter-guide-overlay">
   <div class="ob-card">
-    <div class="ob-dots" id="install-tut-dots"></div>
-    <div id="install-tut-step-info">
-      <div class="ob-icon" id="install-tut-icon"></div>
-      <div class="ob-title" id="install-tut-title"></div>
-      <div class="ob-body" id="install-tut-body"></div>
+    <div class="ob-icon">👋</div>
+    <div class="ob-title">Dobrodošli!</div>
+    <div class="ob-body" style="text-align:left;">
+      <div style="display:flex;gap:10px;margin-bottom:12px;"><span>🏠</span><span><strong>Početna</strong> — pregled tjedna i tvoje sljedeće smjene</span></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;"><span>🔄</span><span><strong>Zamjene</strong> — traži slobodan dan ili preuzmi tuđu smjenu</span></div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;"><span>📆</span><span><strong>Tjedan</strong> — raspored cijelog tima po danima</span></div>
+      <div style="display:flex;gap:10px;"><span>🗓️</span><span><strong>Mjesec</strong> — tvoj mjesečni pregled</span></div>
     </div>
-    <div id="install-tut-step-action" style="display:none;">
-      <div class="ob-icon">📲</div>
-      <div class="ob-title">Instaliraj sada</div>
-      <div class="ob-body">Zadnji korak — spremi ZamijeniMe na početni zaslon.</div>
-      <div id="install-tut-android" style="display:none;text-align:center;margin-bottom:16px;">
-        <button class="btn-primary" id="btn-install-tut-android" style="width:100%;">Instaliraj aplikaciju</button>
-      </div>
-      <div id="install-tut-ios" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:16px;text-align:left;">
-        <strong>1.</strong> Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
-        <strong>2.</strong> Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
-        <strong>3.</strong> Dodirni <strong>Dodaj</strong>
-      </div>
-      <div id="install-tut-generic" style="display:none;font-size:14px;line-height:1.8;color:var(--text-2);margin-bottom:16px;text-align:left;">
-        Otvori izbornik preglednika (obično ⋮ ili ≡) i odaberi <strong>"Dodaj na početni zaslon"</strong> ili <strong>"Instaliraj aplikaciju"</strong>.
-      </div>
-    </div>
-    <button class="ob-next" id="install-tut-next"></button>
+    <button class="ob-next" id="waiter-guide-close">Razumijem</button>
   </div>
 </div>
 
@@ -1072,13 +1057,13 @@ details[open] .hours-chevron::before{content:'▴';}
 <div class="modal-overlay" id="modal-install">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Spremi aplikaciju na početni zaslon</div>
-    <p class="modal-sub" style="margin-bottom:16px;">Ovo je prava aplikacija — samo je nisi preuzeo/la s trgovine aplikacija. Spremi je na početni zaslon za brži pristup, bez adresne trake.</p>
+    <div class="modal-title">Instaliraj ZamijeniMe</div>
+    <p class="modal-sub" style="margin-bottom:16px;">ZamijeniMe se instalira izravno, bez Google Play-a ili App Store-a.</p>
     <div id="install-steps-android" style="display:none;">
       <button class="btn-primary" id="btn-install-android">Instaliraj aplikaciju</button>
     </div>
-    <div id="install-steps-ios" style="display:none;font-size:14px;line-height:1.6;color:var(--text-2);margin-bottom:8px;">
-      1. Dodirni ikonu <strong>Podijeli</strong> (kvadrat sa strelicom) u dnu zaslona<br/>
+    <div id="install-steps-ios" style="display:none;font-size:14px;line-height:1.7;color:var(--text-2);margin-bottom:8px;">
+      1. Dodirni ikonu <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;color:var(--accent);"><path d="M8.5 10.5H6.5A1.5 1.5 0 0 0 5 12v7a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-7a1.5 1.5 0 0 0-1.5-1.5h-2"/><path d="M12 14.5V3.5"/><path d="M8.5 6.5 12 3l3.5 3.5"/></svg> <strong>Podijeli</strong> u dnu zaslona<br/>
       2. Odaberi <strong>"Dodaj na početni zaslon"</strong><br/>
       3. Dodirni <strong>Dodaj</strong>
     </div>
@@ -1117,15 +1102,13 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  // The event can arrive after the install-tutorial overlay is already showing
-  // (it doesn't always fire immediately on a brand-new visit) — if so, and the
-  // final action step is the one currently displayed, swap in the native
-  // one-tap button instead of leaving the manual/generic steps up.
-  const tutOverlay = document.getElementById('install-tut-overlay');
-  if (tutOverlay && tutOverlay.classList.contains('open') && document.getElementById('install-tut-step-action').style.display !== 'none') {
-    document.getElementById('install-tut-android').style.display = 'block';
-    document.getElementById('install-tut-ios').style.display = 'none';
-    document.getElementById('install-tut-generic').style.display = 'none';
+  // Can arrive after modal-install is already showing (doesn't always fire
+  // immediately on a brand-new visit) — swap in the native button live.
+  const installModal = document.getElementById('modal-install');
+  if (installModal && installModal.classList.contains('open')) {
+    document.getElementById('install-steps-android').style.display = 'block';
+    document.getElementById('install-steps-ios').style.display = 'none';
+    document.getElementById('install-steps-generic').style.display = 'none';
   }
 });
 
@@ -1137,10 +1120,7 @@ function isIOSDevice() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 }
 
-function maybeShowInstallPrompt() {
-  if (isStandalonePWA()) return;
-  if (localStorage.getItem('zm_b_install_prompted')) return;
-  localStorage.setItem('zm_b_install_prompted', '1');
+function renderAndOpenInstallModal() {
   document.getElementById('install-steps-android').style.display = 'none';
   document.getElementById('install-steps-ios').style.display = 'none';
   document.getElementById('install-steps-generic').style.display = 'none';
@@ -1154,76 +1134,50 @@ function maybeShowInstallPrompt() {
   document.getElementById('modal-install').classList.add('open');
 }
 
+function maybeShowInstallPrompt() {
+  if (isStandalonePWA()) return;
+  if (localStorage.getItem('zm_b_install_prompted')) return;
+  localStorage.setItem('zm_b_install_prompted', '1');
+  renderAndOpenInstallModal();
+}
+
+function closeInstallModal() {
+  document.getElementById('modal-install').classList.remove('open');
+  if (_pendingWaiterSession) proceedToWaiterGuide();
+}
+
 let _pendingWaiterSession = null;
 
 // Shared exit point for every way a waiter can successfully authenticate:
 // invite-flow first-time PIN setup, invite-flow existing-PIN recovery, the
 // regular returning-device login (handleLoginKey), and PIN-only mode
-// (handlePinOnlyKey). Whichever one fires, the tutorial shows once per
-// device if it hasn't been seen yet. In practice the invite flow only ever
-// runs once per waiter — every day-to-day login after that goes through
-// one of the other two paths, so gating only the invite flow meant the
-// tutorial would almost never actually show.
+// (handlePinOnlyKey). Whichever one fires: show the install modal once per
+// device if needed, then the one-time app guide, then into the app.
 function proceedAfterWaiterAuth(session) {
-  if (!isStandalonePWA() && !localStorage.getItem('zm_b_waiter_install_prompted')) {
-    showInstallTutorial(session);
-  } else {
-    enterWaiterApp(session);
-  }
-}
-
-const INSTALL_TUT_STEPS = [
-  {icon:'👋', title:'Ovo je prava aplikacija', body:'Samo je nisi preuzeo/la s trgovine aplikacija (Play Store ili App Store) — instalira se izravno, ali radi kao svaka druga aplikacija na tvom telefonu.'},
-  {icon:'⚡', title:'Brže, bez preglednika', body:'Otvara se s ikone na početnom zaslonu — bez adresne trake, brže učitavanje.'},
-];
-let _installTutStep = 0;
-
-function showInstallTutorial(session) {
   _pendingWaiterSession = session;
-  localStorage.setItem('zm_b_waiter_install_prompted', '1');
-  _installTutStep = 0;
-  renderInstallTutStep();
-  document.getElementById('install-tut-overlay').classList.add('open');
-}
-
-function renderInstallTutStep() {
-  const totalSteps = INSTALL_TUT_STEPS.length + 1; // +1 for the final install-action step
-  document.getElementById('install-tut-dots').innerHTML = Array.from({length: totalSteps}, (_, i) =>
-    `<div class="ob-dot${i === _installTutStep ? ' active' : ''}"></div>`
-  ).join('');
-
-  if (_installTutStep < INSTALL_TUT_STEPS.length) {
-    const s = INSTALL_TUT_STEPS[_installTutStep];
-    document.getElementById('install-tut-step-info').style.display = 'block';
-    document.getElementById('install-tut-step-action').style.display = 'none';
-    document.getElementById('install-tut-icon').textContent = s.icon;
-    document.getElementById('install-tut-title').textContent = s.title;
-    document.getElementById('install-tut-body').textContent = s.body;
-    document.getElementById('install-tut-next').textContent = 'Dalje →';
+  if (!isStandalonePWA() && !localStorage.getItem('zm_b_waiter_install_prompted')) {
+    localStorage.setItem('zm_b_waiter_install_prompted', '1');
+    renderAndOpenInstallModal();
     return;
   }
+  proceedToWaiterGuide();
+}
 
-  document.getElementById('install-tut-step-info').style.display = 'none';
-  document.getElementById('install-tut-step-action').style.display = 'block';
-  document.getElementById('install-tut-android').style.display = 'none';
-  document.getElementById('install-tut-ios').style.display = 'none';
-  document.getElementById('install-tut-generic').style.display = 'none';
-  if (_deferredInstallPrompt) {
-    document.getElementById('install-tut-android').style.display = 'block';
-  } else if (isIOSDevice()) {
-    document.getElementById('install-tut-ios').style.display = 'block';
-  } else {
-    document.getElementById('install-tut-generic').style.display = 'block';
+function proceedToWaiterGuide() {
+  if (!localStorage.getItem('zm_b_waiter_guide_shown')) {
+    localStorage.setItem('zm_b_waiter_guide_shown', '1');
+    document.getElementById('waiter-guide-overlay').classList.add('open');
+    return;
   }
-  document.getElementById('install-tut-next').textContent = 'Nastavi u aplikaciju →';
+  enterPendingWaiterApp();
 }
 
-function closeInstallTutorial() {
-  document.getElementById('install-tut-overlay').classList.remove('open');
-  finishInstallTutorial();
+function closeWaiterGuide() {
+  document.getElementById('waiter-guide-overlay').classList.remove('open');
+  enterPendingWaiterApp();
 }
 
-async function finishInstallTutorial() {
+async function enterPendingWaiterApp() {
   const session = _pendingWaiterSession;
   _pendingWaiterSession = null;
   await enterWaiterApp(session);
@@ -1449,7 +1403,11 @@ function enterMainApp() {
     const obKey = 'zm_b_ob_done';
     try { if (!localStorage.getItem(obKey)) { startOnboarding(); localStorage.setItem(obKey,'1'); onboardingShown = true; } } catch {}
   }
-  if (!onboardingShown) maybeShowInstallPrompt();
+  // Owners only: waiters are already prompted by proceedAfterWaiterAuth, which
+  // gates on zm_b_waiter_install_prompted. Without the ownerUser check a waiter
+  // trips this second gate (zm_b_install_prompted) too and sees the same install
+  // modal twice in a row.
+  if (ownerUser && !onboardingShown) maybeShowInstallPrompt();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3272,34 +3230,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-cancel-owner-profile').addEventListener('click', closeOwnerProfileModal);
 
   // Add to home screen
-  document.getElementById('btn-install-dismiss').addEventListener('click', () => {
-    document.getElementById('modal-install').classList.remove('open');
-  });
+  document.getElementById('btn-install-dismiss').addEventListener('click', closeInstallModal);
   document.getElementById('btn-install-android').addEventListener('click', async () => {
     if (!_deferredInstallPrompt) return;
     _deferredInstallPrompt.prompt();
     await _deferredInstallPrompt.userChoice;
     _deferredInstallPrompt = null;
-    document.getElementById('modal-install').classList.remove('open');
+    closeInstallModal();
   });
 
-  // Install tutorial (waiter, after PIN setup)
-  document.getElementById('install-tut-skip').addEventListener('click', closeInstallTutorial);
-  document.getElementById('install-tut-next').addEventListener('click', () => {
-    if (_installTutStep < INSTALL_TUT_STEPS.length) {
-      _installTutStep++;
-      renderInstallTutStep();
-    } else {
-      closeInstallTutorial();
-    }
-  });
-  document.getElementById('btn-install-tut-android').addEventListener('click', async () => {
-    if (!_deferredInstallPrompt) return;
-    _deferredInstallPrompt.prompt();
-    await _deferredInstallPrompt.userChoice;
-    _deferredInstallPrompt = null;
-    closeInstallTutorial();
-  });
+  // Waiter app guide (single card, after install step)
+  document.getElementById('waiter-guide-close').addEventListener('click', closeWaiterGuide);
 
   // Onboarding
   document.getElementById('ob-next').addEventListener('click', ()=>{
@@ -3310,10 +3251,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('ob-skip').addEventListener('click', closeOnboarding);
 
   // Close modals on overlay click
-  ['modal-request','modal-day-detail','modal-owner-profile','modal-sunday-settings','modal-install'].forEach(id=>{
+  ['modal-request','modal-day-detail','modal-owner-profile','modal-sunday-settings'].forEach(id=>{
     const overlay=document.getElementById(id);
     if (!overlay) return;
     overlay.addEventListener('click', e=>{if(e.target===overlay) overlay.classList.remove('open');});
+  });
+  document.getElementById('modal-install').addEventListener('click', e=>{
+    if (e.target===document.getElementById('modal-install')) closeInstallModal();
   });
 
   setupSwipe();

@@ -1065,6 +1065,37 @@
       body: "The install-tutorial was a single screen with one line of text above the install action — functionally correct but didn't read as a tutorial. Rebuilt using the same overlay/card pattern as the owner's onboarding walkthrough: card 1 explains this is a real app (not a lesser version — just not downloaded from an app store), card 2 explains the benefit (opens from the home screen, no browser chrome), card 3 is the actual install action (native Android button, iOS steps, or generic fallback, same logic as before). Also corrected the wording everywhere it appeared ('otvara se kao prava aplikacija' / opens like a real app) to state plainly that it is a real app, just distributed differently — the old phrasing undersold it and read as if the app were a lesser imitation.",
       why: "Builder tested the flow after fixing all four login-path gaps and found the install button worked but there was no actual tutorial content around it, and separately flagged that saying the app 'acts like a real app' was inaccurate and undermined confidence in something that is, in fact, a fully real application.",
       date: "29 Jul 2026"
+    },
+    {
+      id: "build-4-27-install-flow-simplified",
+      phase: "build",
+      version: "Build 4.27",
+      versionDate: "10 Aug 2026",
+      tag: "ui",
+      title: "Install tutorial carousel replaced by the install modal plus a single welcome card",
+      body: "The 3-card carousel from 4.26 was more ceremony than the moment deserved: three swipes before a waiter could use the app. Removed it entirely and reused the existing modal-install sheet, followed by one welcome card. proceedAfterWaiterAuth() now shows the install modal (once per device), closeInstallModal() chains into proceedToWaiterGuide(), and the guide is a single card closed by 'Razumijem'. Copy rewritten: the modal is now titled 'Instaliraj ZamijeniMe' with the subtitle 'ZamijeniMe se instalira izravno, bez Google Play-a ili App Store-a.' — naming the app stores directly rather than gesturing at them. The iOS steps now carry an inline SVG of the Share glyph instead of describing it as 'kvadrat sa strelicom'. The welcome card was one dense paragraph and is now four rows, one per tab, using the tab bar's own icons and labels (Početna, Zamjene, Tjedan, Mjesec) so it maps 1:1 onto what the waiter is about to see.",
+      why: "Builder reviewed the 4.26 carousel and judged it too heavy for what it delivers — the waiter just needs to install and know what the four tabs do. iOS gets no install button because Apple exposes no programmatic install API; the Share glyph is the closest available improvement.",
+      date: "10 Aug 2026"
+    },
+    {
+      id: "build-4-27-duplicate-install-modal",
+      phase: "build",
+      version: "Build 4.27",
+      tag: "fix",
+      title: "Waiters were shown the install modal twice in a row",
+      body: "enterMainApp() ended with 'if (!onboardingShown) maybeShowInstallPrompt()', but onboardingShown can only ever be set inside the 'if (ownerUser)' branch, so for a waiter it was always false and maybeShowInstallPrompt() always ran. That call gates on zm_b_install_prompted, a different flag from the zm_b_waiter_install_prompted that proceedAfterWaiterAuth() had just set — so the waiter dismissed the install sheet, saw the welcome card, entered the app, and was immediately shown the identical install sheet again. Now guarded with 'ownerUser &&', making maybeShowInstallPrompt() the owner-only entry point it was always meant to be; waiters are handled solely by proceedAfterWaiterAuth().",
+      why: "Introduced as a side effect of Build 4.24 splitting owner and waiter install prompts into separate localStorage flags — the waiter path tripped both gates. It survived four builds of install-prompt work because nobody had run a waiter login on a device with both flags unset.",
+      date: "10 Aug 2026"
+    },
+    {
+      id: "build-4-27-sw-cached-supabase-reads",
+      phase: "build",
+      version: "Build 4.27",
+      tag: "fix",
+      title: "Service worker was caching every Supabase read, serving stale rows forever",
+      body: "sw.js sent any GET whose path didn't end in .html down the cache-first branch. Supabase reads are GETs on /rest/v1/..., so every API response the app fetched was eligible for permanent caching — waiters, shift requests, schedules, café details. Two fixes: cross-origin requests are now skipped entirely (Supabase and the CDN are network-only, and the browser's own HTTP cache still honours their headers), and the runtime cache write now clones the response synchronously, since caches.open() is async and by the time its .then() ran the body had already been consumed, making clone() throw. Cache name bumped zm-v4 → zm-v5 so the activate handler purges any responses cached under the old behaviour.",
+      why: "The broken clone() had been silently disabling all runtime caching, which masked the far worse cache-everything bug underneath. Fixing the clone turned caching on and the staleness surfaced immediately: a waiter who had already set a PIN was sent back through PIN setup, because the cached row still had joined_at null. Found by the builder while testing the invite-recovery path — one build before it would have shipped.",
+      date: "10 Aug 2026"
     }
   ];
   </script>
