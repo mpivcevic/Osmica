@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.28</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.29</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1104,9 +1104,39 @@ details[open] .hours-chevron::before{content:'▴';}
 // ══════════════════════════════════════════════════════════
 // SUPABASE INIT
 // ══════════════════════════════════════════════════════════
-const SUPA_URL = 'https://vuvvzzktrxydfxgxugke.supabase.co';
-const SUPA_KEY = 'sb_publishable_vwznlZisrrdcHC4Qhm4BNg_4pchX8-M';
+// Backend is chosen by hostname, so localhost and every tunnel URL hit the dev
+// project automatically and it is structurally impossible to mutate production
+// from a test session. Both keys are publishable and are meant to be public.
+//
+// TODO(13 Aug 2026): dev is not created yet — until its url/key are filled in,
+// non-prod hosts still fall through to production and log the warning below.
+// Creating osmica-dev is step B1 of osmica_security_plan.md.
+const SUPA_ENVS = {
+  prod: {
+    url: 'https://vuvvzzktrxydfxgxugke.supabase.co',
+    key: 'sb_publishable_vwznlZisrrdcHC4Qhm4BNg_4pchX8-M',
+  },
+  dev: {
+    url: '',
+    key: '',
+  },
+};
+const IS_PROD_HOST = location.hostname === 'mpivcevic.github.io';
+const SUPA_ENV = (!IS_PROD_HOST && SUPA_ENVS.dev.url) ? SUPA_ENVS.dev : SUPA_ENVS.prod;
+if (!IS_PROD_HOST && !SUPA_ENVS.dev.url) {
+  console.warn('[Osmica] No dev project configured — this session is talking to PRODUCTION data. See osmica_security_plan.md, step B1.');
+}
+const SUPA_URL = SUPA_ENV.url;
+const SUPA_KEY = SUPA_ENV.key;
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Column lists for `waiters`. pin_hash is never read by the client and must
+// never leave the database. invite_token is a credential and is only needed in
+// the owner's admin list, so the shared loader below does not ask for it —
+// migration 001 revokes both columns from the anon role, and a waiter session
+// requesting either would fail the whole query.
+const WAITER_COLS = 'id,cafe_id,name,phone,color,pattern,vacations,joined_at,created_at';
+const WAITER_COLS_ADMIN = `${WAITER_COLS},invite_token`;
 
 // ══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1293,7 +1323,7 @@ function buildDateSchedule(rows) {
 // ══════════════════════════════════════════════════════════
 async function loadAppData(cafe_id) {
   const [wRes, rRes, sRes] = await Promise.all([
-    sb.from('waiters').select('*').eq('cafe_id', cafe_id).order('created_at'),
+    sb.from('waiters').select(WAITER_COLS).eq('cafe_id', cafe_id).order('created_at'),
     sb.from('shift_requests').select('*').eq('cafe_id', cafe_id),
     sb.from('date_schedules').select('*').eq('cafe_id', cafe_id),
   ]);
@@ -1988,7 +2018,9 @@ function switchTab(tab, dir) {
 
 function refreshWaiters() {
   if (!STATE.cafe?.id) return;
-  sb.from('waiters').select('*').eq('cafe_id', STATE.cafe.id).order('created_at')
+  // Admin list only — the owner is authenticated here, so invite_token is
+  // legitimately theirs to read for their own café.
+  sb.from('waiters').select(WAITER_COLS_ADMIN).eq('cafe_id', STATE.cafe.id).order('created_at')
     .then(({ data }) => { if (data) { STATE.waiters = data.map(mapWaiter); renderAdminStaff(); } });
 }
 
@@ -2824,7 +2856,7 @@ async function saveWaiter() {
     const { data, error } = await sb.from('waiters').insert({
       cafe_id: STATE.cafe.id,
       name, phone, color, pattern,
-    }).select().single();
+    }).select(WAITER_COLS_ADMIN).single();
     btn.disabled = false;
     if (error) { showToast('Greška pri dodavanju.'); return; }
     const newWaiter = mapWaiter(data);
