@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="525 240 1006 1657">
+  <style>
+    /* The tab strip is not the page, so this can't use the app's tokens.
+       Light: --accent (#2563eb). Dark: the lighter blue from the dark master
+       (#3b82f6), which holds up against a dark tab background. */
+    .mark { fill: #2563eb; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #3b82f6; }
+    }
+  </style>
+  <path class="mark" fill-rule="evenodd" d="M549,240L1507,240L1507,901L1319,1046L1531,1218L1531,1897L525,1897L525,1218L737,1046L549,901Z M848,503L1208,503L1208,791L1073,937L1073,1180L1234,1323L1234,1634L822,1634L822,1323L983,1180L983,937L848,791Z"/>
+</svg>

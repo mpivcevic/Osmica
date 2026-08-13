@@ -1,24 +1,36 @@
 {
-  "name": "ZamijeniMe",
-  "short_name": "ZamijeniMe",
+  "name": "Osmica",
+  "short_name": "Osmica",
   "description": "Upravljanje smjenama i zamjenama za ugostiteljske timove",
-  "start_url": "./zamijeni_me.html",
+  "start_url": "./osmica.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "lang": "hr",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

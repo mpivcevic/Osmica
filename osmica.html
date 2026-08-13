@@ -7,9 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#2563eb"/>
-<link rel="manifest" href="manifest_b.json"/>
-<link rel="apple-touch-icon" href="icon-192.png"/>
-<title>ZamijeniMe</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png"/>
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png"/>
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+<title>Osmica</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 /* ── TOKENS ───────────────────────────────────────────── */
@@ -49,6 +52,12 @@
   --shift-ii-light:#e0f2fe;
   --shift-iii:     #7c3aed;
   --shift-iii-light:#f5f3ff;
+
+  /* Logo mark. The stroke is the same near-black in both themes — on the dark
+     background it reads as the counters being knocked out rather than as an
+     outline, which is how the dark master was drawn. */
+  --logo-fill:    #2563eb;
+  --logo-stroke:  #0f172a;
 }
 
 [data-theme="dark"] {
@@ -70,6 +79,7 @@
   --shift-i-light: #271200;
   --shift-ii-light:#001829;
   --shift-iii-light:#160b2e;
+  --logo-fill:    #3b82f6;
 }
 
 /* ── RESET ────────────────────────────────────────────── */
@@ -289,8 +299,12 @@ details[open] .hours-chevron::before{content:'▴';}
 
 /* ══ LOGIN SCREEN ═════════════════════════════════════════ */
 #screen-login{background:var(--bg);justify-content:center;align-items:center;padding:clamp(16px,3dvh,32px) 24px;box-sizing:border-box;}
-.login-logo{font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-0.04em;margin-bottom:4px;text-align:center;}
-.login-logo span{color:var(--text);}
+/* Brand lockup: mark above wordmark. Shared by the login, auth and invite
+   screens; each sets its own scale through the two custom props below. */
+.login-logo,.auth-logo,.invite-logo{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;}
+.login-logo span,.auth-logo span,.invite-logo span{font-size:var(--brand-name-s);font-weight:700;letter-spacing:-0.03em;color:var(--text);line-height:1;}
+.brand-mark{display:block;height:var(--brand-mark-h);width:auto;}
+.login-logo{--brand-mark-h:64px;--brand-name-s:30px;margin-bottom:4px;}
 .login-tagline{font-size:13px;color:var(--text-3);text-align:center;margin-bottom:clamp(16px,3dvh,32px);}
 .login-name-display{height:52px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
 .login-name{font-size:22px;font-weight:600;color:var(--accent);opacity:0;transition:opacity 0.2s;}
@@ -319,8 +333,7 @@ details[open] .hours-chevron::before{content:'▴';}
 /* ══ OWNER AUTH SCREEN ════════════════════════════════════ */
 #screen-owner-auth{background:var(--bg);justify-content:center;align-items:center;padding:32px 24px;}
 .auth-card{width:100%;max-width:340px;}
-.auth-logo{font-size:28px;font-weight:700;color:var(--accent);letter-spacing:-0.04em;text-align:center;margin-bottom:4px;}
-.auth-logo span{color:var(--text);}
+.auth-logo{--brand-mark-h:56px;--brand-name-s:26px;margin-bottom:4px;}
 .auth-tagline{font-size:13px;color:var(--text-3);text-align:center;margin-bottom:32px;}
 .auth-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:20px;text-align:center;}
 .auth-error{font-size:13px;color:var(--danger);text-align:center;min-height:18px;margin-bottom:10px;}
@@ -332,8 +345,7 @@ details[open] .hours-chevron::before{content:'▴';}
 /* ══ INVITE SCREEN ════════════════════════════════════════ */
 #screen-invite{background:var(--bg);justify-content:center;align-items:center;padding:32px 24px;}
 .invite-card{width:100%;max-width:340px;text-align:center;}
-.invite-logo{font-size:24px;font-weight:700;color:var(--accent);letter-spacing:-0.04em;margin-bottom:24px;}
-.invite-logo span{color:var(--text);}
+.invite-logo{--brand-mark-h:48px;--brand-name-s:23px;margin-bottom:24px;}
 .invite-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin:0 auto 12px;}
 .invite-name{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px;}
 .invite-cafe{font-size:14px;color:var(--text-3);margin-bottom:28px;}
@@ -534,20 +546,30 @@ details[open] .hours-chevron::before{content:'▴';}
 </style>
 </head>
 <body>
+
+<!-- Logo mark, defined once and referenced with <use>. Inline rather than an
+     <img src="icons/logo.svg"> so the fill can follow the theme tokens —
+     an externally-loaded SVG can't see the page's custom properties. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="logo-mark" viewBox="512 227 1032 1683">
+    <path fill-rule="evenodd" fill="var(--logo-fill)" stroke="var(--logo-stroke)" stroke-width="26" stroke-linejoin="miter" d="M549,240L1507,240L1507,901L1319,1046L1531,1218L1531,1897L525,1897L525,1218L737,1046L549,901Z M848,503L1208,503L1208,791L1052,937L1052,1180L1234,1323L1234,1634L822,1634L822,1323L1004,1180L1004,937L848,791Z"/>
+  </symbol>
+</svg>
+
 <div id="app">
 
 <!-- ══════════════ LOADING ══════════════ -->
 <div id="screen-loading" class="screen active">
-  <div class="login-logo" style="margin-top:auto;margin-bottom:12px;">Zamijeni<span>Me</span></div>
+  <div class="login-logo" style="margin-top:auto;margin-bottom:12px;"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <div class="spinner" style="margin:0 auto;"></div>
   <div style="font-size:13px;color:var(--text-3);margin-top:12px;margin-bottom:auto;">Učitavanje...</div>
 </div>
 
 <!-- ══════════════ LOGIN (waiter PIN) ══════════════ -->
 <div id="screen-login" class="screen">
-  <div class="login-logo">Zamijeni<span>Me</span></div>
+  <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.27</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.28</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -590,7 +612,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <!-- ══════════════ OWNER AUTH ══════════════ -->
 <div id="screen-owner-auth" class="screen">
   <div class="auth-card">
-    <div class="auth-logo">Zamijeni<span>Me</span></div>
+    <div class="auth-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
     <p class="auth-tagline">Upravljaj timom i rasporedom.</p>
     <div class="auth-title" id="auth-title">Prijava vlasnika</div>
     <div class="auth-error" id="auth-error"></div>
@@ -615,7 +637,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <!-- ══════════════ FORGOT PASSWORD ══════════════ -->
 <div id="screen-forgot-password" class="screen">
   <div class="auth-card">
-    <div class="auth-logo">Zamijeni<span>Me</span></div>
+    <div class="auth-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
     <div class="auth-title">Zaboravljena lozinka</div>
     <p class="auth-tagline">Upiši email i poslat ćemo ti poveznicu za resetiranje lozinke.</p>
     <div class="auth-error" id="forgot-error"></div>
@@ -631,7 +653,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <!-- ══════════════ RESET PASSWORD (from email link) ══════════════ -->
 <div id="screen-reset-password" class="screen">
   <div class="auth-card">
-    <div class="auth-logo">Zamijeni<span>Me</span></div>
+    <div class="auth-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
     <div class="auth-title">Nova lozinka</div>
     <p class="auth-tagline">Upiši novu lozinku za svoj račun.</p>
     <div class="auth-error" id="reset-error"></div>
@@ -662,7 +684,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <!-- ══════════════ INVITE ══════════════ -->
 <div id="screen-invite" class="screen">
   <div class="invite-card">
-    <div class="invite-logo">Zamijeni<span>Me</span></div>
+    <div class="invite-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
     <div id="invite-loading" style="text-align:center;padding:20px 0;">
       <div class="spinner" style="margin:0 auto 12px;"></div>
       <div style="font-size:13px;color:var(--text-3);">Provjeravam pozivnicu...</div>
@@ -1057,8 +1079,8 @@ details[open] .hours-chevron::before{content:'▴';}
 <div class="modal-overlay" id="modal-install">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Instaliraj ZamijeniMe</div>
-    <p class="modal-sub" style="margin-bottom:16px;">ZamijeniMe se instalira izravno, bez Google Play-a ili App Store-a.</p>
+    <div class="modal-title">Instaliraj Osmicu</div>
+    <p class="modal-sub" style="margin-bottom:16px;">Osmica se instalira izravno, bez Google Play-a ili App Store-a.</p>
     <div id="install-steps-android" style="display:none;">
       <button class="btn-primary" id="btn-install-android">Instaliraj aplikaciju</button>
     </div>
@@ -1184,7 +1206,7 @@ async function enterPendingWaiterApp() {
 }
 
 const ONBOARDING_STEPS = [
-  {icon:'👋',title:'Dobrodošli u ZamijeniMe',body:'Kratki vodič kroz upravljačke funkcije.'},
+  {icon:'👋',title:'Dobrodošli u Osmicu',body:'Kratki vodič kroz upravljačke funkcije.'},
   {icon:'🔄',title:'Kartica Zamjene',body:'Ovdje vidite sve zahtjeve tima za slobodne dane. Odobrite ili odbijte jednim dodirom.'},
   {icon:'📅',title:'Tjedni raspored',body:'Kartica Tjedan prikazuje tko radi koji dan i u kojoj smjeni.'},
   {icon:'⚙️',title:'Admin panel',body:'Dodajte članove tima, pošaljite im pozivnice i generirajte rasporede.'},
@@ -2286,7 +2308,7 @@ async function submitRequest() {
 
   // Build WhatsApp message
   const shiftAcc = s => s === 'jutro' ? 'jutarnju smjenu' : s === 'međusmjena' ? 'međusmjenu' : 'popodnevnu smjenu';
-  let msg = `[ZamijeniMe]\n\n${w.name} traži slobodan dan ${formatDate(reqSelectedDate)}.`;
+  let msg = `[Osmica]\n\n${w.name} traži slobodan dan ${formatDate(reqSelectedDate)}.`;
   if (canArr.length > 0) {
     if (myShifts.length === 1) {
       msg += `\nMože zamijeniti ${shiftAcc(myShifts[0])} za ${canArr.map(shiftAcc).join(' ili ')}.`;
@@ -2417,7 +2439,7 @@ async function coverRequest(rid) {
   r.status = 'pending_approval';
 
   const requester = waiterById(r.waiterId);
-  const msg = `[ZamijeniMe] ${w.name} nudi pokrivanje smjene za ${requester?.name} — ${shiftLabel(r.shift)} dana ${formatDate(r.date)}. Molimo potvrdi u aplikaciji.`;
+  const msg = `[Osmica] ${w.name} nudi pokrivanje smjene za ${requester?.name} — ${shiftLabel(r.shift)} dana ${formatDate(r.date)}. Molimo potvrdi u aplikaciji.`;
   const waUrl = `https://wa.me/${STATE.owner.phone||''}?text=${encodeURIComponent(msg)}`;
   showToast('Zamjena ponuđena! Obavijesti vlasnika 👇');
   setTimeout(() => {
@@ -2681,7 +2703,7 @@ function showInviteForWaiter(wid) {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   const biz = STATE.owner.businessName ? ` u ${STATE.owner.businessName}` : '';
-  const msg = `Ej ${w.name.split(' ')[0]}!\n\nPozvan/a si u tim kafića${biz}.\nKoristimo ZamijeniMe za rasporede i zamjene smjena — da ne moraš zvati šefa u 6 ujutro :)\n\nKlikni i postavi svoj PIN:\n${url}\n\nVidimo se u rasporedu!`;
+  const msg = `Ej ${w.name.split(' ')[0]}!\n\nPozvan/a si u tim kafića${biz}.\nKoristimo Osmicu za rasporede i zamjene smjena — da ne moraš zvati šefa u 6 ujutro :)\n\nKlikni i postavi svoj PIN:\n${url}\n\nVidimo se u rasporedu!`;
   const waUrl = `https://wa.me/${w.phone||''}?text=${encodeURIComponent(msg)}`;
   modal.innerHTML = `<div class="modal">
     <div class="modal-handle"></div>
@@ -2812,7 +2834,7 @@ async function saveWaiter() {
     const url = inviteUrl(newWaiter.invite_token);
     document.getElementById('waiter-invite-link-text').textContent = url;
     const biz = STATE.owner.businessName ? ` u ${STATE.owner.businessName}` : '';
-    const msg = `Ej ${name.split(' ')[0]}!\n\nPozvan/a si u tim kafića${biz}.\nKoristimo ZamijeniMe za rasporede i zamjene smjena — da ne moraš zvati šefa u 6 ujutro :)\n\nKlikni i postavi svoj PIN:\n${url}\n\nVidimo se u rasporedu!`;
+    const msg = `Ej ${name.split(' ')[0]}!\n\nPozvan/a si u tim kafića${biz}.\nKoristimo Osmicu za rasporede i zamjene smjena — da ne moraš zvati šefa u 6 ujutro :)\n\nKlikni i postavi svoj PIN:\n${url}\n\nVidimo se u rasporedu!`;
     const waUrl = `https://wa.me/${phone||''}?text=${encodeURIComponent(msg)}`;
     document.getElementById('btn-wa-invite').href = waUrl;
     document.getElementById('btn-copy-invite').onclick = () => {

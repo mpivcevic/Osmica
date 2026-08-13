@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZamijeniMe — Project Log</title>
+  <title>Osmica — Project Log</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- ============================================================
@@ -1096,6 +1096,37 @@
       body: "sw.js sent any GET whose path didn't end in .html down the cache-first branch. Supabase reads are GETs on /rest/v1/..., so every API response the app fetched was eligible for permanent caching — waiters, shift requests, schedules, café details. Two fixes: cross-origin requests are now skipped entirely (Supabase and the CDN are network-only, and the browser's own HTTP cache still honours their headers), and the runtime cache write now clones the response synchronously, since caches.open() is async and by the time its .then() ran the body had already been consumed, making clone() throw. Cache name bumped zm-v4 → zm-v5 so the activate handler purges any responses cached under the old behaviour.",
       why: "The broken clone() had been silently disabling all runtime caching, which masked the far worse cache-everything bug underneath. Fixing the clone turned caching on and the staleness surfaced immediately: a waiter who had already set a PIN was sent back through PIN setup, because the cached row still had joined_at null. Found by the builder while testing the invite-recovery path — one build before it would have shipped.",
       date: "10 Aug 2026"
+    },
+    {
+      id: "build-4-28-renamed-to-osmica",
+      phase: "build",
+      version: "Build 4.28",
+      versionDate: "13 Aug 2026",
+      tag: "decision",
+      title: "App renamed from ZamijeniMe to Osmica",
+      body: "The name is now Osmica ('the eight'). Every user-facing string was updated: manifest name and short_name, the document title, the install modal ('Instaliraj Osmicu', 'Osmica se instalira izravno, bez Google Play-a ili App Store-a.'), the onboarding welcome card, the WhatsApp and SMS templates ('[Osmica]' prefix, 'Koristimo Osmicu za rasporede i zamjene smjena'), and the owner guide. Osmica is a feminine noun, so the accusative form Osmicu is used wherever the old name sat as a direct object — a straight find-and-replace would have produced 'Instaliraj Osmica'. The historical changelog entry recording why ZamijeniMe was chosen is deliberately left intact, since it documents a decision that was genuinely made at the time.",
+      why: "Builder decided the old name had run its course. Osmica is shorter, reads as a nickname the way a café team would actually use it, and the numeral gives the app a mark to draw — which ZamijeniMe, a two-word imperative, never had.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-28-logo-and-icons",
+      phase: "build",
+      version: "Build 4.28",
+      tag: "ui",
+      title: "Logo mark added and the icon set rebuilt",
+      body: "The text wordmark 'Zamijeni/Me' — two-tone, accent blue plus body text colour — appeared on six screens (loading, login, three auth screens, invite) and could not survive the rename: Osmica is one word with nothing to split. Replaced by a proper lockup: the new mark above the word 'Osmica'. The mark is an '8' whose counters form an hourglass, which is the app's subject. It is defined once as an SVG <symbol> at the top of <body> and pulled in six times with <use>, inline rather than <img src> so the fill can follow the theme tokens — an externally loaded SVG cannot see the page's custom properties. Two new tokens drive it: --logo-fill (#2563eb light, #3b82f6 dark) and --logo-stroke (#0f172a in both, so on the dark background the counters read as knocked out rather than outlined). Icons moved from four loose files at the repo root into icons/, and the manifest now declares 'any' and 'maskable' as separate entries.",
+      why: "The old manifest declared both icons as 'any maskable' on a single file. Android pads maskable icons before applying the platform mask, so one file serving both roles either gets its edges cropped as 'any' or floats undersized as 'maskable'. Splitting them was free to do while the icons were being replaced anyway. The favicon is a separate theme-aware SVG because the browser tab is not the page and cannot use the app's tokens — Chrome ignores the media attribute on <link rel=icon>, so the query lives inside the SVG.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-28-prototype-deleted",
+      phase: "build",
+      version: "Build 4.28",
+      tag: "scope",
+      title: "The original localStorage prototype was deleted and the _b suffix dropped",
+      body: "The repo carried two apps: zamijeni_me.html, the original prototype with loadState/saveState against localStorage and no backend at all, and zamijeni_me_b.html, the Supabase-backed real app that had received every commit since Build 4.21. The prototype was six builds stale and shared no code path with the live app. It is now deleted, and the live app drops its suffix: zamijeni_me_b.html → osmica.html, manifest_b.json → manifest.json. The guide, changelog and design doc were renamed to match. No redirect stubs were left at the old filenames, so the previously installed PWA shortcut no longer resolves and has to be reinstalled once.",
+      why: "Builder confirmed the app was installed only on his own device, so breaking the start_url cost nothing and a clean tree was worth more than compatibility stubs that would have lived at the repo root forever. The prototype remains recoverable from git history.",
+      date: "13 Aug 2026"
     }
   ];
   </script>
@@ -1389,7 +1420,7 @@
 </div>
 
 <footer>
-  zamijeni me · project log · last updated <span id="last-updated"></span>
+  osmica · project log · last updated <span id="last-updated"></span>
 </footer>
 
 <script>

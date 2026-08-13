@@ -1,5 +1,16 @@
-const CACHE = 'zm-v5';
-const STATIC = ['./manifest.json', './icon-192.png', './icon-512.png'];
+// Renamed from zm-v* at the ZamijeniMe → Osmica rebrand. The activate handler
+// deletes every cache whose name isn't CACHE, so the old zm-v5 entries — which
+// point at icon paths that no longer exist — are purged on first load.
+const CACHE = 'osmica-v1';
+const STATIC = [
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512-maskable.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon.svg'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
