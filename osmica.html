@@ -1735,21 +1735,30 @@ let _inviteStep = 'setup'; // 'setup' | 'confirm' | 'recover'
 let _invitePinFirst = '';
 let _invitePinBuf = '';
 let _inviteVerifying = false;
+let _inviteToken = null;
 
 async function handleInviteLoad(token) {
-  const { data: waiter, error } = await sb.from('waiters').select('*').eq('invite_token', token).single();
+  // Held because claim_invite() deliberately never returns the token, and
+  // mark_invite_joined() is keyed on it rather than on the waiter id.
+  _inviteToken = token;
+  // claim_invite() is SECURITY DEFINER and returns only what this screen shows,
+  // never the token itself. Filtering a table query on invite_token would need
+  // SELECT privilege on that column, which migration 002 revokes from anon —
+  // so this RPC is what keeps the invite path working, not just tidier. The
+  // café name comes back with it, which also drops a second round trip.
+  const { data: rows, error } = await sb.rpc('claim_invite', { p_token: token });
+  const waiter = Array.isArray(rows) ? rows[0] : null;
   document.getElementById('invite-loading').style.display = 'none';
   if (error || !waiter) {
     document.getElementById('invite-error').style.display = 'block';
     return;
   }
   _inviteWaiter = waiter;
-  const { data: cafe } = await sb.from('cafes').select('name').eq('id', waiter.cafe_id).single();
 
   document.getElementById('invite-avatar').style.background = waiter.color || AVATAR_COLORS[0];
   document.getElementById('invite-avatar').textContent = initials(waiter.name);
   document.getElementById('invite-waiter-name').textContent = waiter.name;
-  document.getElementById('invite-cafe-name').textContent = cafe?.name || '';
+  document.getElementById('invite-cafe-name').textContent = waiter.cafe_name || '';
   document.getElementById('invite-content').style.display = 'block';
 
   if (!waiter.joined_at) {
@@ -1834,7 +1843,10 @@ async function handleInviteKey(k) {
       document.getElementById('invite-instruction').textContent = 'Postavi 4-znamenkasti PIN za prijavu.';
       renderInviteDots([]); return;
     }
-    await sb.from('waiters').update({ joined_at: new Date().toISOString() }).eq('id', _inviteWaiter.id);
+    // Was a bare anonymous UPDATE, which migration 003 revokes. The function is
+    // token-keyed and only ever sets joined_at once, so a passer-by cannot flip
+    // someone else's row to "joined" and lock them out of PIN setup.
+    await sb.rpc('mark_invite_joined', { p_token: _inviteToken });
     localStorage.setItem('zm_b_cafe_id', _inviteWaiter.cafe_id);
     const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
     setWaiterSession(session);
