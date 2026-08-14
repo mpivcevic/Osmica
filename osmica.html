@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.31</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.32</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -3443,13 +3443,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function open() {
     const card = sheet.querySelector('.card');
     const ov = readOverride();
-    const cafeId = STATE.cafe?.id || localStorage.getItem('zm_b_cafe_id');
     card.innerHTML = `<h4>Dev identity switcher</h4>
       <div class="meta">${onDevBackend
         ? 'backend: dev'
         : '<span class="warn">backend: PRODUCTION</span> — SUPA_ENVS.dev is empty'}<br>${SUPA_URL}</div>
       <div class="sub">Loading…</div>`;
     sheet.classList.add('open');
+
+    // zm_b_cafe_id is only ever written by the waiter paths, and STATE.cafe is
+    // only populated once someone is logged in — so on a fresh device sitting
+    // on the login screen we know of no café, which is exactly the moment the
+    // switcher is most useful. Fall back to whichever café the project holds.
+    // Safe here because a dev project has one, and this code never runs in prod.
+    let cafeId = STATE.cafe?.id || localStorage.getItem('zm_b_cafe_id');
+    if (!cafeId) {
+      const { data } = await sb.from('cafes').select('id').order('created_at').limit(1);
+      cafeId = data?.[0]?.id || null;
+    }
 
     let waiters = [];
     if (cafeId) {
