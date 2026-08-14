@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.29</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.30</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1361,6 +1361,22 @@ async function init() {
     document.getElementById('reset-error').textContent = '';
     showScreen('screen-reset-password');
     return;
+  }
+
+  // 2b. Dev-only identity override (see the dev switcher at the end of this
+  // file). Deliberately checked BEFORE the owner session, so picking a waiter
+  // sticks across reloads without having to sign the owner out — otherwise the
+  // owner's Supabase session would win every time and the switch would appear
+  // to do nothing. Inert in production: IS_PROD_HOST short-circuits it, and the
+  // switcher that writes the key never runs there either.
+  if (!IS_PROD_HOST) {
+    const devOv = window.__devIdentityOverride?.();
+    if (devOv?.kind === 'waiter') {
+      setWaiterSession(devOv.session);
+      localStorage.setItem('zm_b_cafe_id', devOv.session.cafe_id);
+      await enterWaiterApp(devOv.session);
+      return;
+    }
   }
 
   // 3. Owner session (Supabase Auth)
@@ -3354,6 +3370,138 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+
+// ══════════════════════════════════════════════════════════
+// DEV IDENTITY SWITCHER — never runs in production
+// ══════════════════════════════════════════════════════════
+// Gated on IS_PROD_HOST, so on mpivcevic.github.io not a single line below
+// executes and nothing is injected into the DOM. Everything it needs is
+// self-contained here — no markup, no CSS elsewhere — so deleting this block
+// removes the feature completely.
+//
+// Exists because testing every waiter flow on one phone otherwise means
+// clearing browser data and burning an invite link for each switch, and that
+// gets worse at Stage C when credentials become device-bound and invites become
+// single-use.
+(function devSwitcher() {
+  if (IS_PROD_HOST) return;
+
+  const OVERRIDE_KEY = 'zm_b_dev_as';
+  const readOverride = () => {
+    try { return JSON.parse(localStorage.getItem(OVERRIDE_KEY)); } catch { return null; }
+  };
+
+  // True once SUPA_ENVS.dev is filled in. Until then a tunnel session is still
+  // talking to production, which is exactly the thing worth shouting about.
+  const onDevBackend = !!SUPA_ENVS.dev.url && SUPA_ENV === SUPA_ENVS.dev;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    #dev-pill{position:fixed;left:10px;bottom:calc(var(--tab-h) + 10px);z-index:9999;
+      font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;
+      padding:7px 10px;border-radius:999px;border:none;cursor:pointer;
+      background:${onDevBackend ? '#16a34a' : '#dc2626'};color:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.28);}
+    #dev-sheet{position:fixed;inset:0;z-index:10000;display:none;
+      background:rgba(0,0,0,.5);align-items:flex-end;}
+    #dev-sheet.open{display:flex;}
+    #dev-sheet .card{background:var(--surface);color:var(--text);width:100%;
+      max-height:78vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:14px 16px 24px;}
+    #dev-sheet h4{font-size:13px;margin:0 0 2px;}
+    #dev-sheet .meta{font-size:11px;color:var(--text-2);margin-bottom:12px;
+      font-family:ui-monospace,Menlo,monospace;word-break:break-all;}
+    #dev-sheet .warn{color:#dc2626;font-weight:700;}
+    #dev-sheet button.row{display:flex;align-items:center;gap:10px;width:100%;
+      padding:11px 12px;margin-bottom:6px;border:1px solid var(--border);
+      border-radius:10px;background:var(--surface);color:var(--text);
+      font-size:14px;text-align:left;cursor:pointer;}
+    #dev-sheet button.row.active{border-color:var(--accent);background:var(--accent-light);}
+    #dev-sheet .dot{width:22px;height:22px;border-radius:50%;flex:0 0 auto;
+      color:#fff;font:700 10px/22px system-ui;text-align:center;}
+    #dev-sheet .danger{color:var(--danger);border-color:var(--danger);}
+    #dev-sheet .sub{font-size:11px;color:var(--text-3);margin:14px 0 6px;}
+  `;
+  document.head.appendChild(style);
+
+  const pill = document.createElement('button');
+  pill.id = 'dev-pill';
+  pill.textContent = onDevBackend ? 'DEV' : 'DEV→PROD';
+  document.body.appendChild(pill);
+
+  const sheet = document.createElement('div');
+  sheet.id = 'dev-sheet';
+  sheet.innerHTML = '<div class="card"></div>';
+  document.body.appendChild(sheet);
+  sheet.addEventListener('click', e => { if (e.target === sheet) sheet.classList.remove('open'); });
+
+  function switchTo(override) {
+    if (override) localStorage.setItem(OVERRIDE_KEY, JSON.stringify(override));
+    else localStorage.removeItem(OVERRIDE_KEY);
+    // Full reload rather than re-entering in place: init() is the only thing
+    // that knows how to assemble app state from scratch, and half-swapping a
+    // live session is how you get bugs that only exist in the switcher.
+    location.href = location.pathname;
+  }
+
+  async function open() {
+    const card = sheet.querySelector('.card');
+    const ov = readOverride();
+    const cafeId = STATE.cafe?.id || localStorage.getItem('zm_b_cafe_id');
+    card.innerHTML = `<h4>Dev identity switcher</h4>
+      <div class="meta">${onDevBackend
+        ? 'backend: dev'
+        : '<span class="warn">backend: PRODUCTION</span> — SUPA_ENVS.dev is empty'}<br>${SUPA_URL}</div>
+      <div class="sub">Loading…</div>`;
+    sheet.classList.add('open');
+
+    let waiters = [];
+    if (cafeId) {
+      const { data } = await sb.from('waiters').select(WAITER_COLS).eq('cafe_id', cafeId).order('created_at');
+      waiters = data || [];
+    }
+
+    const rows = waiters.map(w => {
+      const active = ov?.kind === 'waiter' && ov.session.id === w.id;
+      const session = { id: w.id, name: w.name, cafe_id: w.cafe_id, color: w.color };
+      return `<button class="row ${active ? 'active' : ''}" data-session='${JSON.stringify(session).replace(/'/g, '&#39;')}'>
+        <span class="dot" style="background:${w.color || '#64748b'}">${(w.name || '?').trim().charAt(0).toUpperCase()}</span>
+        <span>${w.name}${w.joined_at ? '' : ' <em style="font-size:11px;color:var(--text-3)">(nije postavio PIN)</em>'}</span>
+      </button>`;
+    }).join('');
+
+    card.innerHTML = `<h4>Dev identity switcher</h4>
+      <div class="meta">${onDevBackend
+        ? 'backend: dev'
+        : '<span class="warn">backend: PRODUCTION</span> — SUPA_ENVS.dev is empty'}<br>${SUPA_URL}</div>
+      <div class="sub">OWNER</div>
+      <button class="row ${ov?.kind === 'owner' || !ov ? 'active' : ''}" data-owner="1">
+        <span class="dot" style="background:var(--accent)">V</span><span>Vlasnik (normal login)</span>
+      </button>
+      <div class="sub">WAITERS${cafeId ? '' : ' — no café known on this device yet'}</div>
+      ${rows || '<div class="sub">none found</div>'}
+      <div class="sub">RESET</div>
+      <button class="row danger" data-wipe="1">Clear all local data and reload</button>`;
+
+    card.querySelectorAll('button.row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.wipe) {
+          Object.keys(localStorage).filter(k => k.startsWith('zm_')).forEach(k => localStorage.removeItem(k));
+          sb.auth.signOut().finally(() => switchTo(null));
+          return;
+        }
+        if (btn.dataset.owner) { switchTo({ kind: 'owner' }); return; }
+        switchTo({ kind: 'waiter', session: JSON.parse(btn.dataset.session) });
+      });
+    });
+  }
+
+  pill.addEventListener('click', open);
+
+  // init() reads this to route straight to the chosen waiter. This IIFE runs at
+  // parse time and init() runs on DOMContentLoaded, so it is always defined by
+  // the time it is needed.
+  window.__devIdentityOverride = readOverride;
+})();
 </script>
 </body>
 </html>
