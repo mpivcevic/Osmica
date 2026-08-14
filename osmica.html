@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.30</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.31</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1108,17 +1108,14 @@ details[open] .hours-chevron::before{content:'▴';}
 // project automatically and it is structurally impossible to mutate production
 // from a test session. Both keys are publishable and are meant to be public.
 //
-// TODO(13 Aug 2026): dev is not created yet — until its url/key are filled in,
-// non-prod hosts still fall through to production and log the warning below.
-// Creating osmica-dev is step B1 of osmica_security_plan.md.
 const SUPA_ENVS = {
   prod: {
     url: 'https://vuvvzzktrxydfxgxugke.supabase.co',
     key: 'sb_publishable_vwznlZisrrdcHC4Qhm4BNg_4pchX8-M',
   },
   dev: {
-    url: '',
-    key: '',
+    url: 'https://simavghwjnqytcyeunto.supabase.co',
+    key: 'sb_publishable_xOx4POsl9coB1utDMHlHAw_h1q4oxWA',
   },
 };
 const IS_PROD_HOST = location.hostname === 'mpivcevic.github.io';
