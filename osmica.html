@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.33</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.34</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1127,13 +1127,17 @@ const SUPA_URL = SUPA_ENV.url;
 const SUPA_KEY = SUPA_ENV.key;
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// Column lists for `waiters`. pin_hash is never read by the client and must
-// never leave the database. invite_token is a credential and is only needed in
-// the owner's admin list, so the shared loader below does not ask for it —
-// migration 001 revokes both columns from the anon role, and a waiter session
-// requesting either would fail the whole query.
-const WAITER_COLS = 'id,cafe_id,name,phone,color,pattern,vacations,joined_at,created_at';
-const WAITER_COLS_ADMIN = `${WAITER_COLS},invite_token`;
+// Column lists for `waiters`. Three columns are owner-only and are revoked from
+// the anon role in migrations 005 and 006, so asking for any of them from a
+// waiter session fails the whole query — hence two lists rather than one.
+//
+//   pin_hash      never read by the client at all, at any privilege
+//   invite_token  a credential; the owner needs it to build invite links
+//   phone         personal data; every use is owner-side (admin list, WhatsApp
+//                 invite, edit form, schedule-notify buttons) — no waiter-facing
+//                 screen shows another waiter's number
+const WAITER_COLS = 'id,cafe_id,name,color,pattern,vacations,joined_at,created_at';
+const WAITER_COLS_ADMIN = `${WAITER_COLS},phone,invite_token`;
 
 // ══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1318,9 +1322,14 @@ function buildDateSchedule(rows) {
 // ══════════════════════════════════════════════════════════
 // DATA LOADING
 // ══════════════════════════════════════════════════════════
-async function loadAppData(cafe_id) {
+// asOwner decides which column list is requested. Passed explicitly rather than
+// read from STATE.currentUser, which enterOwnerApp only sets *after* this
+// resolves. Getting it wrong is not subtle: an owner without it loses phone
+// numbers in the admin list and the schedule-notify buttons, and a waiter with
+// it gets a 401 on the whole roster.
+async function loadAppData(cafe_id, asOwner = false) {
   const [wRes, rRes, sRes] = await Promise.all([
-    sb.from('waiters').select(WAITER_COLS).eq('cafe_id', cafe_id).order('created_at'),
+    sb.from('waiters').select(asOwner ? WAITER_COLS_ADMIN : WAITER_COLS).eq('cafe_id', cafe_id).order('created_at'),
     sb.from('shift_requests').select('*').eq('cafe_id', cafe_id),
     sb.from('date_schedules').select('*').eq('cafe_id', cafe_id),
   ]);
@@ -1430,7 +1439,8 @@ async function enterOwnerApp(user) {
     phone: user.user_metadata?.phone || '',
     businessName: cafe.name,
   };
-  await loadAppData(cafe.id);
+  // Owner context: needs phone and invite_token for the admin screens.
+  await loadAppData(cafe.id, true);
   STATE.currentUser = 'owner';
   enterMainApp();
 }
