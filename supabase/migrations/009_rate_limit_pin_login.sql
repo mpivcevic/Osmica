@@ -245,4 +245,4 @@ COMMIT;
 -- PIN. Pokušaj ponovo." because the client cannot tell an empty result from a
 -- wrong PIN. is_pin_locked is granted to anon precisely so the keypad can call
 -- it after a failure and say "too many attempts, try again in a minute". That is
--- a client change and belongs in its own build — see TOMORROW.md.
+-- a client change and belongs in its own build — shipped as v4.36.
