@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.36</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.37</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1396,7 +1396,12 @@ async function init() {
   if (_passwordRecoveryPending) {
     return;
   }
-  if (session) {
+  // NOT `if (session)`. Since Stage C, waiters hold a Supabase session too —
+  // an anonymous one, created by signInAnonymously() when they claimed their
+  // invite. Routing on the mere presence of a session would drop every linked
+  // waiter into the owner's admin panel, with the owner's column grants, on
+  // their next app open. Only a real (non-anonymous) user is an owner.
+  if (session && !session.user.is_anonymous) {
     await enterOwnerApp(session.user);
     return;
   }
@@ -1566,6 +1571,58 @@ async function handlePinOnlyKey(k) {
 // this second, explicit question. Falls back to the plain message if
 // is_pin_locked is unavailable, so the app still works against a database that
 // has not had migration 009 applied.
+// Stage C1 — bind this browser to this waiter.
+//
+// signInAnonymously() mints a real Supabase user with a device-scoped refresh
+// token, which is what finally gives waiters an auth.uid(). link_waiter_to_auth()
+// then attaches that uid to the waiter row and burns the invite token, so a
+// forwarded link is inert from that moment on.
+//
+// Every failure path here is non-fatal by design. This build changes no
+// user-visible behaviour: the PIN login path is untouched and still works, so an
+// unlinked waiter is inconvenienced (they can be re-invited), never locked out.
+// Stage C3 is where the identity starts being load-bearing, and it must not
+// begin until every waiter shows a non-null auth_user_id.
+//
+// If this silently does nothing, the usual cause is Authentication -> Providers
+// -> Anonymous sign-ins being disabled on that Supabase project. Check the
+// column, not the app.
+async function linkWaiterIdentity(token) {
+  if (!token) return false;
+  try {
+    // Never disturb an existing real session. On a waiter's own phone there is
+    // none; on the builder's laptop the owner may be signed in, and replacing
+    // that session with an anonymous one would silently log the owner out.
+    const { data: { session: existing } } = await sb.auth.getSession();
+    if (existing && !existing.user.is_anonymous) {
+      console.warn('[Osmica] Owner session present — skipping waiter identity linking.');
+      return false;
+    }
+
+    if (!existing) {
+      const { error: signInError } = await sb.auth.signInAnonymously();
+      if (signInError) {
+        console.warn('[Osmica] Anonymous sign-in failed:', signInError.message);
+        return false;
+      }
+    }
+
+    const { data: result, error } = await sb.rpc('link_waiter_to_auth', { p_token: token });
+    if (error) {
+      console.warn('[Osmica] link_waiter_to_auth failed:', error.message);
+      return false;
+    }
+    if (result !== 'ok' && result !== 'already_linked') {
+      console.warn('[Osmica] link_waiter_to_auth returned:', result);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[Osmica] Waiter identity linking threw:', e);
+    return false;
+  }
+}
+
 async function pinFailureMessage(cafeId, fallback) {
   if (!cafeId) return fallback;
   try {
@@ -1897,6 +1954,12 @@ async function handleInviteKey(k) {
     localStorage.setItem('zm_b_cafe_id', _inviteWaiter.cafe_id);
     const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
     setWaiterSession(session);
+    // Stage C1: give this waiter a real identity on this device. Deliberately
+    // after the PIN is set and deliberately non-fatal — the PIN login path is
+    // untouched, so a waiter whose linking fails is not locked out, they just
+    // have no auth.uid() yet and can be re-invited. Nothing depends on the
+    // identity until C3.
+    await linkWaiterIdentity(_inviteToken);
     // Remove invite token from URL
     history.replaceState({}, '', location.pathname);
     showToast('PIN postavljen! Dobrodošli 👋');
