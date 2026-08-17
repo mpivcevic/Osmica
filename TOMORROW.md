@@ -319,13 +319,14 @@ from pg_proc where proname = '<the function>';
 
 ### After the sequence, in priority order
 
-1. **v4.36** — a locked-out waiter currently sees *"Pogrešan PIN. Pokušaj ponovo."*
-   because the client can't distinguish an empty result from a wrong PIN. 009
-   grants `is_pin_locked` to anon so the keypad can say "too many attempts"
-   instead. Two call sites, `osmica.html:1552` and `:1596`. Cosmetic.
-2. **`012_dev_align_with_prod.sql`** — not yet written. Drift table below, plus
-   the 007 dev variant above.
-3. **Commit the paperwork** (see *Disclosure*).
+1. ~~**v4.36**~~ — ✅ shipped 17 Aug. `pinFailureMessage()` asks `is_pin_locked`
+   after a failure and says "too many attempts" instead of "wrong PIN". All three
+   PIN entry points. Tested on dev: attempts 1–9 show the plain message, the
+   10th flips, and a correct PIN works again after the minute expires.
+2. ~~**`dev/013_dev_align_with_prod.sql`**~~ — ✅ written and applied 17 Aug.
+   Verified by comparing dev and production REST responses side by side, not by
+   trusting the migration.
+3. ~~**Commit the paperwork**~~ — ✅ done 17 Aug, commit `63bd78f`.
 4. **Stage C** — waiter identity via `signInAnonymously()`. The real fix. Decided:
    personal devices only, no shared kiosk. Deletes `login_waiter_by_pin`,
    `verify_waiter_pin` and the `pin_attempts` table.
@@ -343,7 +344,11 @@ always has a fresh subject.
 Tunnel and localhost hit dev automatically; only `mpivcevic.github.io` reaches
 production. The dev pill shows green `DEV` when that is working.
 
-**Known drift — `012_dev_align_with_prod.sql` still to be written:**
+**Drift as it stood before `dev/013` — ✅ all rows closed 17 Aug. Kept as the
+record of what differed and why it mattered.** Dev and production now answer
+identically on every anon probe (`name,color` 200; `phone`, `invite_token`, `*`
+all 401; `set_waiter_pin` 404 on both). The one remaining difference is
+deliberate: dev keeps anonymous writes.
 
 | | production | dev |
 |---|---|---|
@@ -353,11 +358,30 @@ production. The dev pill shows green `DEV` when that is working.
 | `shift_requests.status` CHECK | 5 values, incl. **`cover_rejected`** | only 4 — would reject a real app write |
 | `date_schedules.created_at` | exists | missing |
 | `waiters.pattern` / `vacations` | nullable | NOT NULL |
-| `set_waiter_pin` | returns `boolean` | returns `void` |
-| `login_waiter_by_pin` | returns id, cafe_id, name, phone, color, pattern (`phone` dropped by 009) | returns id, name, cafe_id, color |
+| `set_waiter_pin` | dropped by 008 | still present |
+| `login_waiter_by_pin` | id, cafe_id, name, color, pattern | ✅ aligned by 009 |
+| `verify_waiter_pin` | throttled | ✅ aligned by 009 |
 | `set_updated_at` trigger | exists | missing |
 | column grants (005/006) | applied | not applied — dev is fully open |
-| `set_waiter_pin_by_token` (007) | after step 1 | missing — see the dev-breaks note |
+| `set_waiter_pin_by_token` (007) | applied | ✅ applied 17 Aug via dev/012 (with a `::text` cast) |
+| `claim_invite` / `mark_invite_joined` | take `text` | take `uuid` |
+
+**`013_dev_align_with_prod.sql` is written and closes every row above.** Note it
+is numbered 013, not 012 — 012 is the token-keyed set_pin, already applied.
+
+Two things to know before running it:
+
+- It drops and recreates `claim_invite` / `mark_invite_joined`, because their
+  `uuid` parameter compares directly against `invite_token`. Change the column
+  first and both break on a type mismatch — hence the ordering inside the file.
+- It applies the 005/006 column grants, so **invite tokens stop being readable
+  over REST on dev too**. Fetch them from the SQL editor from then on.
+
+The `set_updated_at` function in it is **copied verbatim from production**
+(`pg_get_functiondef`, 17 Aug), including its lack of a `search_path` pin — that
+is correct for a plain trigger function, which runs as the invoker rather than
+the owner. Which tables production attaches it to was not captured, but dev has
+`updated_at` on `shift_requests` only, so there is nothing else to attach.
 
 The `cover_rejected` one is the sharp edge: the app writes it at
 `osmica.html:2515` when a waiter declines to cover a shift. That works in
@@ -373,15 +397,13 @@ cannot mislead you.
 
 ## Repo state
 
-- `main` at **v4.34**, pushed, deployed, verified live.
-- **`osmica.html` is at v4.35 in the working tree, uncommitted** — the client half
-  of 007. Ships in step 2.
+- `main` at **v4.36**, pushed, deployed, verified live.
 - Branch `security/stage-a` was merged and deleted.
-- **Uncommitted on purpose:** `osmica_changelog.html` (entries for 4.29–4.30
-  written; 4.31–4.35 still to write), `supabase/`, `osmica_security_plan.md`,
-  this file.
+- **Everything is committed.** The paperwork went public in `63bd78f` on 17 Aug:
+  all migrations, the security plan, this file, and changelog entries through
+  4.36. Only `WorkFile.md` (personal backlog) stays untracked, by choice.
 
-### Disclosure — why the paperwork is held back
+### Disclosure — why the paperwork was held back until 17 Aug
 
 The repo is public and the changelog is served on Pages. These files describe
 holes that were open, and one that **is open right now**. Publishing a map to a
