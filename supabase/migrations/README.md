@@ -10,8 +10,8 @@ commit message.
 **One shared counter across both databases. Never reuse a number.**
 
 The next migration takes the next free number regardless of which project it
-targets. As of 17 Aug 2026 the high-water mark is `013`, so the next file —
-production or dev — is `014`.
+targets. As of 17 Aug 2026 the high-water mark is `014`, so the next file —
+production or dev — is `015`.
 
 Production's sequence will therefore have gaps. That is expected: a gap means
 that number went to dev.
@@ -55,6 +55,7 @@ SQL editor's success message.
 | 009 | rate limit both PIN oracles | ✅ applied |
 | 010 | rotate leaked credentials | ✅ applied |
 | 011 | revoke residual privileges | ✅ applied 17 Aug — mark_invite_joined confirmed gone on both |
+| 014 | Stage C1: waiter identity (`auth_user_id`, `link_waiter_to_auth`) | ❌ **not run** — additive; needs Anonymous sign-ins enabled first |
 
 ### `migrations/dev/` — osmica-dev (`simavghwjnqytcyeunto`)
 
@@ -65,8 +66,8 @@ SQL editor's success message.
 | 012 | token-keyed set_waiter_pin (dev variant) | ✅ applied |
 | 013 | align dev with production | ✅ applied |
 
-Production's `009` and `011` are also run against dev — they are not dev-specific,
-so they get no dev-numbered file.
+Production's `009`, `011` and `014` are also run against dev — they are not
+dev-specific, so they get no dev-numbered file.
 
 ## Two files that are kept on purpose despite never being run
 
