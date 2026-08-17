@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.35</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.36</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1554,8 +1554,25 @@ async function handlePinOnlyKey(k) {
     for (let i = 0; i < 4; i++) { const d = document.getElementById(`dot-${i}`); if (d) d.classList.add('error'); }
     dotsEl.classList.add('shake');
     setTimeout(() => { dotsEl.classList.remove('shake'); PIN_BUFFER = ''; renderPinDots([]); }, 400);
-    err.textContent = 'Pogrešan PIN. Pokušaj ponovo.';
+    err.textContent = await pinFailureMessage(localStorage.getItem('zm_b_cafe_id'), 'Pogrešan PIN. Pokušaj ponovo.');
   }
+}
+
+// After a failed PIN attempt, ask separately whether the café's keypad is locked.
+// login_waiter_by_pin and verify_waiter_pin deliberately answer the same way for
+// "wrong PIN" and "locked out", so the login response never confirms to an
+// attacker that they have found the throttle. The waiter at the till still needs
+// telling, otherwise they keep retrying and keep extending the lockout — hence
+// this second, explicit question. Falls back to the plain message if
+// is_pin_locked is unavailable, so the app still works against a database that
+// has not had migration 009 applied.
+async function pinFailureMessage(cafeId, fallback) {
+  if (!cafeId) return fallback;
+  try {
+    const { data: locked } = await sb.rpc('is_pin_locked', { p_cafe_id: cafeId });
+    if (locked) return 'Previše pokušaja. Pričekaj minutu pa pokušaj ponovo.';
+  } catch (_) { /* treat as not locked */ }
+  return fallback;
 }
 
 function renderPinDots(dots) {
@@ -1598,7 +1615,7 @@ async function handleLoginKey(k) {
       }
       dotsEl.classList.add('shake');
       setTimeout(() => { dotsEl.classList.remove('shake'); PIN_BUFFER = ''; renderPinDots([]); }, 400);
-      err.textContent = 'Pogrešan PIN. Pokušaj ponovo.';
+      err.textContent = await pinFailureMessage(_loginWaiterSession && _loginWaiterSession.cafe_id, 'Pogrešan PIN. Pokušaj ponovo.');
     }
   }
 }
@@ -1906,7 +1923,7 @@ async function handleInviteKey(k) {
         if (d) d.classList.add('error');
       }
       setTimeout(() => { _invitePinBuf = ''; renderInviteDots([]); }, 400);
-      err.textContent = 'Pogrešan PIN.';
+      err.textContent = await pinFailureMessage(_inviteWaiter && _inviteWaiter.cafe_id, 'Pogrešan PIN.');
     }
   }
 }
