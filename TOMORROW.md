@@ -1,0 +1,402 @@
+# Osmica — execution plan
+
+Last verified against live production: 17 Aug 2026, by probing, not by trusting
+any "Success" message.
+
+**Where you are:** migrations 001–010 are applied and probed. v4.35 is deployed.
+The unauthenticated takeover is closed, both PIN oracles are rate-limited, and
+every credential that leaked has been rotated. Anonymous reads of names, colours,
+shift patterns and schedules remain open — that needs Stage C then Stage D.
+
+**Next:** commit the paperwork (the disclosure hold has expired — see bottom),
+then v4.36, then `012_dev_align_with_prod.sql`, then Stage C.
+
+---
+
+## Every link you need
+
+### Production — Supabase project `ZamijeniMe` (ref `vuvvzzktrxydfxgxugke`)
+
+> ⚠️ `ZamijeniMe` **is** production. Before running anything, confirm the project
+> name in the dashboard's top-left corner.
+
+| What | Link |
+|---|---|
+| **SQL Editor — new query** (where every migration runs) | https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/sql/new |
+| Database → Functions (read function definitions) | https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/database/functions |
+| Table Editor (eyeball `waiters` rows) | https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/editor |
+| Postgres logs (if something 500s) | https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/logs/postgres-logs |
+| Project Settings → General (the optional rename) | https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/settings/general |
+
+### Dev — Supabase project `osmica-dev` (ref `simavghwjnqytcyeunto`)
+
+| What | Link |
+|---|---|
+| **SQL Editor — new query** (test 009 here first) | https://supabase.com/dashboard/project/simavghwjnqytcyeunto/sql/new |
+| Table Editor | https://supabase.com/dashboard/project/simavghwjnqytcyeunto/editor |
+
+### App and repo
+
+| What | Link |
+|---|---|
+| **Live app** (production backend) | https://mpivcevic.github.io/osmica/ |
+| Repo | https://github.com/mpivcevic/osmica |
+| Deploy status — watch v4.35 go out | https://github.com/mpivcevic/osmica/actions |
+| Pages settings | https://github.com/mpivcevic/osmica/settings/pages |
+
+### Local files
+
+| What | Path |
+|---|---|
+| Step 1 migration | `supabase/migrations/007_add_token_keyed_set_pin.sql` |
+| Step 4 migration | `supabase/migrations/008_drop_insecure_set_waiter_pin.sql` |
+| Step 5 migration | `supabase/migrations/009_rate_limit_pin_login.sql` |
+| Step 6 migration | `supabase/migrations/010_rotate_leaked_credentials.sql` |
+| The v4.35 build | `osmica.html` |
+| Full security analysis | `osmica_security_plan.md` |
+
+---
+
+## Data note — production holds test data, not a live roster
+
+All six waiter rows carry the same number (the builder's own), **on purpose**:
+nobody has run a real-life test yet. So production is not yet a live café, and
+"rotate the credentials" was hygiene rather than incident response.
+
+Two things follow, and both matter later:
+
+- When real waiters are added, the per-person numbers must land before anyone
+  uses the 💬 invite button — it sends to the `phone` column, so identical
+  numbers would hand everyone the same link, which is an account handover.
+- The roster is **six** waiters. Earlier notes and 010's comments say five.
+
+## ✅ RESOLVED 17 Aug — the unauthenticated waiter takeover
+
+Found 17 Aug 2026 by reading the function bodies, not by probing endpoints.
+Confirmed on production with an all-zeros UUID that matches no row; **not** run
+against a real waiter.
+
+`set_waiter_pin(p_waiter_id uuid, p_pin text)` is `SECURITY DEFINER`, granted to
+`anon`, and authenticates nothing. `waiters.id` is anon-readable. So:
+
+```
+1. GET  /waiters?select=id,name                 -> pick a target
+2. POST /rpc/set_waiter_pin {id, "1234"}        -> their PIN is now 1234
+3. POST /rpc/login_waiter_by_pin {cafe, "1234"} -> logged in as them
+```
+
+Three requests, no guessing, any of the six waiters. **Closed by 008 on 17 Aug**
+— `set_waiter_pin` now 404s where it returned `200 true`.
+
+The two facts that set the running order, kept because they generalise:
+
+- **Rotating credentials did not fix it.** 010 nulls `pin_hash`;
+  `set_waiter_pin` overwrote whatever was there, `NULL` included. Rotating first
+  would have handed fresh PINs to the same hole. **Rotation goes last.**
+- **Rate limiting did not fix it either.** There was nothing to brute force.
+  009 protects a lock this walked around, so **009 came after 007/008.**
+
+---
+
+## The sequence — ✅ ALL SIX STEPS COMPLETE, 17 Aug 2026
+
+Kept as the record of what was run and how each step was verified. Nothing here
+is outstanding.
+
+### Step 1 — Run 007 (5 min, zero risk)
+
+Additive only: creates `set_waiter_pin_by_token(token, pin)` and touches nothing
+that already exists. Run it even if you can't finish the rest today.
+
+→ [Production SQL Editor](https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/sql/new)
+— confirm top-left says `ZamijeniMe`, paste `supabase/migrations/007_add_token_keyed_set_pin.sql`, Run.
+
+**Verify** (still in the SQL Editor):
+```sql
+select set_waiter_pin_by_token(gen_random_uuid()::text, '1234');  -- invalid_token
+select set_waiter_pin_by_token('anything', '12');                 -- invalid_pin
+```
+
+---
+
+### Step 2 — Deploy v4.35 (10 min)
+
+`osmica.html` is already edited and uncommitted. Line 1860 now calls
+`set_waiter_pin_by_token` and no longer calls `mark_invite_joined` (007 folds it
+in). Footer bumped to v4.35.
+
+```bash
+git add osmica.html
+git commit -m "Build 4.35: PIN setup is keyed on the invite token"
+git push
+```
+
+Only `osmica.html` — the paperwork stays back (see *Disclosure* below).
+
+→ Watch it land: [Actions](https://github.com/mpivcevic/osmica/actions)
+→ Confirm the footer reads **v4.35**: https://mpivcevic.github.io/osmica/
+
+> **Hard-refresh.** There is a service worker (`sw.js`); a normal reload can
+> serve you the old build and make step 3 look broken when it isn't.
+
+---
+
+### Step 3 — Complete one real invite → PIN setup (15 min)
+
+This proves the new path end to end **before** step 4 removes the old one. Do not
+skip it — 008 is the irreversible one.
+
+All five waiters have already joined, so no live invite link is in setup mode.
+Reset exactly one waiter to create a test subject. Pick your own waiter row if
+you have one, so nobody else is disturbed:
+
+```sql
+-- Pick the subject
+select id, name, joined_at from public.waiters order by name;
+
+-- Reset just that one
+update public.waiters
+set joined_at = null,
+    pin_hash = null,
+    invite_token = gen_random_uuid()::text
+where name = '<the one waiter>';
+
+-- The link to open
+select 'https://mpivcevic.github.io/osmica/?invite=' || invite_token
+from public.waiters where name = '<the one waiter>';
+```
+
+Open that link on a phone, set a 4-digit PIN, confirm you land in the app. This
+costs that person one PIN reset — harmless, since step 6 rotates everyone anyway.
+
+**Then confirm the invite is genuinely single-use:** open the same link again. It
+should now show *"Ova poveznica više ne vrijedi"* rather than offering PIN setup.
+That's 007's `joined_at IS NULL` check working.
+
+---
+
+### Step 4 — Run 008 (5 min) — the irreversible one
+
+Drops the insecure `set_waiter_pin`. **Only after step 3 passed.**
+
+→ [Production SQL Editor](https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/sql/new)
+— paste `supabase/migrations/008_drop_insecure_set_waiter_pin.sql`, Run.
+
+**Verify the takeover is dead** — this returned `200 true` before; it must now fail:
+```bash
+curl -s -X POST "https://vuvvzzktrxydfxgxugke.supabase.co/rest/v1/rpc/set_waiter_pin" \
+  -H "apikey: sb_publishable_vwznlZisrrdcHC4Qhm4BNg_4pchX8-M" \
+  -H "Authorization: Bearer sb_publishable_vwznlZisrrdcHC4Qhm4BNg_4pchX8-M" \
+  -H "Content-Type: application/json" \
+  -d '{"p_waiter_id":"00000000-0000-0000-0000-000000000000","p_pin":"0000"}'
+# expect: 404, function not found
+```
+
+---
+
+### Step 5 — Run 009 (20 min, test on dev first)
+
+Rate-limits both PIN oracles. Independent of 008 — you can run this while step 3
+waits on a waiter.
+
+Testing 009 means deliberately triggering a lockout, which locks the real café's
+keypad for a minute. **Do that on dev.**
+
+→ [Dev SQL Editor](https://supabase.com/dashboard/project/simavghwjnqytcyeunto/sql/new)
+first, then [Production SQL Editor](https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/sql/new).
+
+Verification block is at the bottom of `009_rate_limit_pin_login.sql`. To clear a
+lockout instantly while testing:
+```sql
+delete from public.pin_attempts where cafe_id = '<cafe>';
+```
+
+---
+
+### Step 6 — Run 010 and send the links (30 min) — do not run mid-shift
+
+Rotates both burned credentials by pushing all five waiters back through the
+invite flow: fresh `invite_token`, `pin_hash` → NULL, `joined_at` → NULL.
+
+**On COMMIT every waiter is logged out and cannot get back in until they open a
+new link.** Have the five WhatsApp messages ready to send — the script prints
+them.
+
+→ [Production SQL Editor](https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/sql/new)
+— paste `supabase/migrations/010_rotate_leaked_credentials.sql`, Run, then send.
+
+**Verify:**
+```sql
+select count(*) from public.waiters where pin_hash is not null;  -- expect 0
+```
+
+---
+
+## ⚠️ Dev breaks after step 2 until it gets 007
+
+Localhost and every tunnel URL hit `osmica-dev`, and v4.35 calls
+`set_waiter_pin_by_token`, which does not exist there. **Dev's invite flow will
+error until dev receives 007.**
+
+Not a straight copy: dev's `waiters.invite_token` is `uuid`, production's is
+`text`, so 007's `where invite_token = p_token` needs a cast. This is part of the
+unwritten `012_dev_align_with_prod.sql` — ask and I'll write the dev variant.
+
+Nothing else in dev is affected, and production is unaffected either way.
+
+---
+
+## Reference
+
+### Production: what is actually true right now
+
+| Anonymous, with only the publishable key | Status |
+|---|---|
+| INSERT / UPDATE / DELETE, all four tables | **blocked (401)** ✅ |
+| read `pin_hash` | **blocked** ✅ |
+| read `invite_token` | **blocked** ✅ |
+| `select=*` on waiters | **blocked** ✅ |
+| read `phone` | **blocked** ✅ (006, verified 17 Aug) |
+| set any waiter's PIN via `set_waiter_pin` | **closed** ✅ (008, probed 404 on 17 Aug) |
+| **unlimited PIN guesses, both oracles** | **OPEN** 🔴 ← step 5 |
+| read waiter name / colour / pattern / vacations | open — needs Stage D |
+| read `cafes`, `shift_requests`, `date_schedules` | open — needs Stage D |
+
+### Migration ledger
+
+| File | State |
+|---|---|
+| `001_claim_invite_rpc.sql` | ✅ applied (after being corrected uuid → text) |
+| `002_revoke_anon_columns.sql` | ⚠️ ran clean, **did nothing** — superseded by 005. Delete it from your saved queries; it reports success while achieving nothing, which is the worst kind of leftover. |
+| `003_revoke_anon_writes.sql` | ✅ applied — this is the big one |
+| `004_rate_limit_pin_login.sql` | ❌ **never run — superseded by 009.** Throttles only one of the two oracles, never decays the counter, and leaves its helpers `EXECUTE`-able by PUBLIC. Delete it from saved queries. |
+| `005_fix_anon_column_grants.sql` | ✅ applied |
+| `006_revoke_anon_phone.sql` | ✅ applied 16 Aug, probed clean 17 Aug. Owner smoke test passed all four steps. |
+| `007_add_token_keyed_set_pin.sql` | ✅ applied 17 Aug (needed a second pass — see search_path note below). Verified: bad token → `invalid_token`, short PIN → `invalid_pin`, real token on a joined waiter → `invalid_token`, and the happy path → `ok`. |
+| `008_drop_insecure_set_waiter_pin.sql` | ✅ applied 17 Aug. **Takeover confirmed closed:** `set_waiter_pin` now 404s where it previously returned `200 true`. Login path unaffected. |
+| `009_rate_limit_pin_login.sql` | ✅ applied 17 Aug to **prod and dev**. Full lockout proven on dev: 10 wrong → `is_pin_locked` true, correct PIN then rejected, `verify_waiter_pin` also throttled, no `phone` in the login payload. On prod, verified non-destructively (one wrong guess only): helpers 401 to anon, `pin_attempts` 401. |
+| `010_rotate_leaked_credentials.sql` | ✅ applied 17 Aug. All **six** waiters reset (`joined_at` null) and all six new invite links verified via `claim_invite` to resolve to the correct person before sending. |
+
+Why 002 failed silently: `REVOKE SELECT (col) ... FROM anon` only subtracts
+column-level privileges, and `anon` held a table-level grant, which confers every
+column. 005 and 006 use the working shape — drop the table grant, then grant back
+the allowed columns one by one.
+
+### The search_path trap — cost two round trips on 17 Aug
+
+`crypt()` and `gen_salt()` come from pgcrypto, which lives in the **`extensions`**
+schema. The original functions carried **no** `search_path`, which is the only
+reason those calls ever resolved. Pinning `SET search_path = public, pg_temp` —
+the usual hardening — makes every `crypt()` call fail.
+
+It fails **on the happy path only**. Token validation and PIN-format checks
+return before reaching `crypt()`, so a smoke test of those passes cleanly while
+the function is entirely broken. Any new `SECURITY DEFINER` function here must
+use `SET search_path = public, extensions, pg_temp`.
+
+Second trap, same day: re-running a corrected migration through a *saved query*
+in the SQL editor silently re-applies the old text. Confirm what actually landed:
+
+```sql
+select proname, coalesce(array_to_string(proconfig,' | '),'(none)')
+from pg_proc where proname = '<the function>';
+```
+
+### What 009 changes beyond rate limiting
+
+- **`login_waiter_by_pin` no longer returns `phone`.** 006 made that column
+  owner-only, but this `SECURITY DEFINER` function handed it to anon regardless.
+  The client never read it (`osmica.html:1549`), so no build is needed. This is
+  why 009 must `DROP` the function rather than `CREATE OR REPLACE`.
+- **Both functions gain `SET search_path = public, pg_temp`.** Neither had it.
+  Not exploitable through PostgREST, which sets the search_path itself, but it is
+  the hijack `001` already warns about and was free to fix here.
+- **Escalating lockout** (10 fails → 1 min, 20 → 5, 30+ → 15) with a 15-minute
+  decay, instead of 004's flat lock that never reset.
+- **Accepted trade-off:** the lockout is café-wide, so an attacker can deliberately
+  lock the keypad. A nuisance where the alternative is takeover; Stage C deletes
+  the whole mechanism.
+
+### After the sequence, in priority order
+
+1. **v4.36** — a locked-out waiter currently sees *"Pogrešan PIN. Pokušaj ponovo."*
+   because the client can't distinguish an empty result from a wrong PIN. 009
+   grants `is_pin_locked` to anon so the keypad can say "too many attempts"
+   instead. Two call sites, `osmica.html:1552` and `:1596`. Cosmetic.
+2. **`012_dev_align_with_prod.sql`** — not yet written. Drift table below, plus
+   the 007 dev variant above.
+3. **Commit the paperwork** (see *Disclosure*).
+4. **Stage C** — waiter identity via `signInAnonymously()`. The real fix. Decided:
+   personal devices only, no shared kiosk. Deletes `login_waiter_by_pin`,
+   `verify_waiter_pin` and the `pin_attempts` table.
+5. **Stage D** — RLS everywhere. Closes the remaining read exposure.
+
+---
+
+## Dev environment: working, but drifted
+
+`osmica-dev` (`simavghwjnqytcyeunto`) is live and usable. Café **Štacija**, five
+fake waiters, distinct PINs: Ana `1111`, Bruno `2222`, Cvita `3333`, Duje `4444`.
+**Eva Evec** has no PIN and has not joined — deliberately, so the invite flow
+always has a fresh subject.
+
+Tunnel and localhost hit dev automatically; only `mpivcevic.github.io` reaches
+production. The dev pill shows green `DEV` when that is working.
+
+**Known drift — `012_dev_align_with_prod.sql` still to be written:**
+
+| | production | dev |
+|---|---|---|
+| `waiters.invite_token` | `text`, default `gen_random_uuid()::text` | `uuid` |
+| `waiters` UNIQUE (invite_token) | yes | missing |
+| `shift_requests.approved_by` | `text` | `uuid` |
+| `shift_requests.status` CHECK | 5 values, incl. **`cover_rejected`** | only 4 — would reject a real app write |
+| `date_schedules.created_at` | exists | missing |
+| `waiters.pattern` / `vacations` | nullable | NOT NULL |
+| `set_waiter_pin` | returns `boolean` | returns `void` |
+| `login_waiter_by_pin` | returns id, cafe_id, name, phone, color, pattern (`phone` dropped by 009) | returns id, name, cafe_id, color |
+| `set_updated_at` trigger | exists | missing |
+| column grants (005/006) | applied | not applied — dev is fully open |
+| `set_waiter_pin_by_token` (007) | after step 1 | missing — see the dev-breaks note |
+
+The `cover_rejected` one is the sharp edge: the app writes it at
+`osmica.html:2515` when a waiter declines to cover a shift. That works in
+production and would fail in dev on a constraint violation — a bug that exists
+only in the test environment, which is the most expensive kind.
+
+Dev should receive 001, 005, 006 and 007 (so the *readable API shape* matches
+prod) but **not** 003 — dev keeps anonymous writes so single-phone testing is
+unimpeded. That keeps drift to exactly one property, and it is the one that
+cannot mislead you.
+
+---
+
+## Repo state
+
+- `main` at **v4.34**, pushed, deployed, verified live.
+- **`osmica.html` is at v4.35 in the working tree, uncommitted** — the client half
+  of 007. Ships in step 2.
+- Branch `security/stage-a` was merged and deleted.
+- **Uncommitted on purpose:** `osmica_changelog.html` (entries for 4.29–4.30
+  written; 4.31–4.35 still to write), `supabase/`, `osmica_security_plan.md`,
+  this file.
+
+### Disclosure — why the paperwork is held back
+
+The repo is public and the changelog is served on Pages. These files describe
+holes that were open, and one that **is open right now**. Publishing a map to a
+live weakness is worth avoiding while it is live. Only hardening code has gone
+public so far, which is why step 2 commits `osmica.html` alone.
+
+Commit everything once steps 1–6 are done and the credentials are rotated. At
+that point what remains exposed is names and shift patterns — not credentials,
+not contact details.
+
+### Optional tidy-up, afterwards
+
+Rename the production Supabase project `ZamijeniMe` → `osmica-prod`
+([Project Settings → General](https://supabase.com/dashboard/project/vuvvzzktrxydfxgxugke/settings/general)).
+Display name only; URL, keys and data are untouched. Left until after the work
+because `ZamijeniMe` vs `osmica-dev` are impossible to confuse at a glance,
+whereas `osmica-prod` vs `osmica-dev` differ by four characters — and picking the
+wrong project is the one mistake that actually costs something.

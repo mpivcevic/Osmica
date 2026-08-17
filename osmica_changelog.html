@@ -1127,6 +1127,123 @@
       body: "The repo carried two apps: zamijeni_me.html, the original prototype with loadState/saveState against localStorage and no backend at all, and zamijeni_me_b.html, the Supabase-backed real app that had received every commit since Build 4.21. The prototype was six builds stale and shared no code path with the live app. It is now deleted, and the live app drops its suffix: zamijeni_me_b.html → osmica.html, manifest_b.json → manifest.json. The guide, changelog and design doc were renamed to match. No redirect stubs were left at the old filenames, so the previously installed PWA shortcut no longer resolves and has to be reinstalled once.",
       why: "Builder confirmed the app was installed only on his own device, so breaking the start_url cost nothing and a clean tree was worth more than compatibility stubs that would have lived at the repo root forever. The prototype remains recoverable from git history.",
       date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-29-anon-writes-found-open",
+      phase: "build",
+      version: "Build 4.29",
+      versionDate: "13 Aug 2026",
+      tag: "decision",
+      title: "Security work resumed — anonymous writes found wide open",
+      body: "Re-probed the production database with nothing but the publishable key that ships in the page. All four tables are anonymously readable, which was known. What was not known — it was listed as untested on 10 Aug — is that they are also anonymously WRITABLE: PATCH and DELETE both return 204, meaning the statement was accepted and executed, affecting no rows only because the probe filtered on a UUID that does not exist. Anyone holding the key can alter or delete the café, the roster and every schedule. Also confirmed: waiters exposes pin_hash (bcrypt over a 4-digit PIN, a 10,000-key space), invite_token (account takeover for any waiter with joined_at null), and phone. Git history was scanned for leaked secrets and is clean — no service_role key or JWT-format secret has ever been committed, so there is nothing to rotate. Full plan written to osmica_security_plan.md.",
+      why: "Builder asked to revisit safety now that the rename is done, with two constraints: local tunnel testing has to keep working, and the app needs to be shareable with Dottore for a browse. Both are addressed by splitting production from development rather than by locking down a single shared project.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-29-stop-shipping-pin-hash",
+      phase: "build",
+      version: "Build 4.29",
+      tag: "fix",
+      title: "Client no longer requests pin_hash, and asks for invite_token only as the owner",
+      body: "Three calls did select('*') on waiters, so every roster load pulled pin_hash and invite_token into the browser even though the client never reads pin_hash at all. Replaced with two explicit column lists. WAITER_COLS omits both and is used by loadAppData(), which serves owners and waiters alike. WAITER_COLS_ADMIN adds invite_token and is used only by refreshWaiters() and the add-waiter insert — both admin-tab paths where the caller is an authenticated owner reading tokens for their own café. The split matters because migration 002 revokes both columns from the anon role: a request for a revoked column fails the entire query, so the narrowing has to ship before the revoke, not after.",
+      why: "This is the half of the fix that needs no database change and cannot break anything — asking for fewer columns always works. Landing it first means the revoke migration is a no-op for the app rather than a coordinated deploy.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-29-backend-by-hostname",
+      phase: "build",
+      version: "Build 4.29",
+      tag: "scope",
+      title: "Backend is now chosen by hostname, so tunnels cannot reach production",
+      body: "The Supabase URL and key were hardcoded, which meant a cloudflared tunnel session on the laptop was reading and writing the real café's data — one bad test away from losing production. Replaced with a SUPA_ENVS map and IS_PROD_HOST check: only mpivcevic.github.io uses production, so localhost and every tunnel URL fall to the dev project automatically. No env files and no build step, which matters for a single-file app with neither. The dev entry is deliberately empty until the osmica-dev project exists; until then non-prod hosts still fall through to production and log a console warning, so this build changes no behaviour at all.",
+      why: "Structural rather than procedural: there is nothing to remember and no flag to forget. It also makes the Dottore demo trivial later, since pointing him at a dev-backed deployment becomes a hostname question rather than a code change.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-29-migrations-prepared",
+      phase: "build",
+      version: "Build 4.29",
+      tag: "scope",
+      title: "Four SQL migrations written and staged, none applied yet",
+      body: "supabase/migrations/ now holds 001_claim_invite_rpc (adds claim_invite() and mark_invite_joined(), both SECURITY DEFINER with a pinned search_path, so the anonymous invite path stops touching invite_token directly), 002_revoke_anon_columns (revokes SELECT on pin_hash and invite_token from anon), 003_revoke_anon_writes (revokes INSERT/UPDATE/DELETE from anon on all four tables), and 004_rate_limit_pin_login (attempt counter plus a 15-minute lockout after ten wrong PINs). Order is load-bearing: 001 is additive and safe, the client build calling it must ship next, and only then can 002 and 003 revoke without breaking the invite flow. None have been run — applying them needs dashboard access.",
+      why: "Two dependencies surfaced while writing them that a straight lockdown would have broken. Filtering a query on invite_token requires SELECT privilege on that column, so the revoke kills the invite lookup unless the RPC replaces it first; and finishing an invite marks joined_at with a bare anonymous UPDATE, which 003 would have blocked, hence mark_invite_joined() being keyed on the token rather than the waiter id.",
+      date: "13 Aug 2026"
+    },
+    {
+      id: "build-4-30-dev-identity-switcher",
+      phase: "build",
+      version: "Build 4.30",
+      versionDate: "14 Aug 2026",
+      tag: "ui",
+      title: "Dev-only identity switcher for testing every role on one phone",
+      body: "A floating pill, bottom-left, opening a sheet that lists the owner and every waiter in the café; picking one stores a dev override and reloads straight into that identity. Also carries a 'clear all local data' reset for testing first-run flows. The whole thing is one self-contained IIFE at the end of the file that returns immediately when IS_PROD_HOST is true — no markup, no CSS anywhere else, nothing injected into the DOM in production, and deleting the block removes the feature entirely. init() gained a matching guard that applies a stored waiter override BEFORE checking the owner's Supabase session, because otherwise a logged-in owner's session wins on every reload and the switch appears to do nothing. The pill doubles as a backend indicator: green 'DEV' when SUPA_ENVS.dev is configured, red 'DEV→PROD' when a non-production host is still falling through to the production database.",
+      why: "Builder needs to keep testing on a single phone for the foreseeable period, and testing every waiter flow otherwise means clearing browser data and burning an invite link per switch. It gets materially worse at Stage C, where credentials become device-bound and invite links become single-use. Worth being explicit that this is a development answer to a development problem — the product model stays personal-device, because designing the real auth around a shared device would put every waiter back on a shared credential.",
+      date: "14 Aug 2026"
+    },
+    {
+      id: "build-4-31-dev-project-live",
+      phase: "build",
+      version: "Build 4.31",
+      versionDate: "14 Aug 2026",
+      tag: "scope",
+      title: "Non-production hosts now talk to osmica-dev",
+      body: "SUPA_ENVS.dev is filled in with the new dev project, so from this build localhost and every tunnel URL read and write osmica-dev instead of the real café, and the dev pill turns green. Production is reachable only from mpivcevic.github.io. Both keys are publishable and are meant to be public. Requires supabase/migrations/dev/010_dev_schema.sql to have been applied, or non-production hosts find no tables at all.",
+      why: "4.29 built the switch but deliberately left the dev slot empty, so until now every tunnel session was still pointed at production data. This is the build where that stops being true.",
+      date: "14 Aug 2026"
+    },
+    {
+      id: "build-4-32-switcher-before-login",
+      phase: "build",
+      version: "Build 4.32",
+      versionDate: "14 Aug 2026",
+      tag: "fix",
+      title: "Dev switcher works before you are logged in",
+      body: "The switcher listed waiters only when a café was already known — STATE.cafe, set at login, or zm_b_cafe_id, written only by the waiter paths. On a fresh device sitting on the login screen neither exists, so it offered the owner and nothing else. It now falls back to the project's first café when none is known, which is safe because a dev project holds exactly one and the block never runs in production. The café lookup also moved to after the sheet is shown, so the added await doesn't delay it opening.",
+      why: "A fresh device on the login screen is precisely the situation the switcher exists for, and it was the one case it did not handle.",
+      date: "14 Aug 2026"
+    },
+    {
+      id: "build-4-33-invite-rpcs-live",
+      phase: "build",
+      version: "Build 4.33",
+      versionDate: "14 Aug 2026",
+      tag: "scope",
+      title: "Invite path moves onto claim_invite / mark_invite_joined",
+      body: "Version bump for the security/stage-a merge, now that migration 001 has created both functions in production. The anonymous invite lookup no longer selects or filters on invite_token directly, and finishing an invite goes through a token-keyed SECURITY DEFINER function rather than a bare anonymous UPDATE.",
+      why: "Ordering was load-bearing: the RPCs had to exist in production before the client could call them, and the client had to be live before the column grants could be revoked. Shipping these out of order breaks the invite flow for anyone mid-signup.",
+      date: "14 Aug 2026"
+    },
+    {
+      id: "build-4-34-phone-owner-only",
+      phase: "build",
+      version: "Build 4.34",
+      versionDate: "14 Aug 2026",
+      tag: "scope",
+      title: "Phone numbers become owner-only",
+      body: "phone sat in the shared column list, so it was fetched by waiter sessions and therefore had to stay readable by anon. Every actual use is owner-side — the admin staff list, the WhatsApp invite, the edit form and the schedule-notify buttons — and no waiter-facing screen shows another waiter's number, so it moved to WAITER_COLS_ADMIN. loadAppData() now takes asOwner explicitly rather than leaving the owner's phone access dependent on refreshWaiters() having run first, which only held because the schedule generator is reached through the Admin tab. Passed as an argument rather than read from STATE.currentUser, which enterOwnerApp sets only after loadAppData resolves.",
+      why: "Pairs with migration 006, which must be applied after this deploys — revoking the column first would 401 the waiter roster load. Splitting waiters reads by role for the first time made the owner path the thing most likely to break, so it was smoke-tested before the revoke went in.",
+      date: "14 Aug 2026"
+    },
+    {
+      id: "build-4-35-pin-setup-token-keyed",
+      phase: "build",
+      version: "Build 4.35",
+      versionDate: "17 Aug 2026",
+      tag: "fix",
+      title: "PIN setup is keyed on the invite token",
+      body: "PIN setup now goes through set_waiter_pin_by_token(token, pin), which resolves the waiter from the invite token server-side and refuses any row that has already joined. The previous function took a waiter id and authenticated nothing, and waiter ids are readable by anyone with the page open — so it could be used to set another person's PIN and then log in as them. Setting the PIN and marking the invite joined now happen in the same statement, so the separate mark_invite_joined call is gone and there is no longer a window where a PIN is set but the invite is still open. The setup screen also distinguishes a taken PIN, a malformed PIN and a dead link, instead of showing one message for all three.",
+      why: "Found by reading the function bodies rather than by probing endpoints, which is worth recording: a SECURITY DEFINER function bypasses every column grant, so it has to be audited for what it authenticates, not just for what it returns. Months of testing table permissions had not surfaced it. The server-side joined_at check also makes the invite genuinely single-use for PIN setup, which the client had always assumed but nothing enforced.",
+      date: "17 Aug 2026"
+    },
+    {
+      id: "security-stage-a-b-complete",
+      phase: "build",
+      version: "Build 4.35",
+      tag: "decision",
+      title: "Stage A and B complete: ten migrations applied, all credentials rotated",
+      body: "Migrations 001–010 are applied to production and verified by probing with the publishable key and no session, rather than by trusting the SQL editor's success message. Anonymous INSERT, UPDATE and DELETE are blocked on all four tables. Anonymous reads of pin_hash, invite_token, phone and select=* on waiters are blocked. Both PIN entry points are rate-limited with an escalating, decaying lockout — ten wrong guesses costs a minute, thirty costs fifteen — and the helper functions that drive it are not callable by anon, which an earlier draft of that migration would have left exposed. Every invite token was reissued and every PIN cleared, since both had been world-readable for months and must be assumed known. Still open: anonymous reads of names, colours, shift patterns and schedules, which need waiter identity (Stage C) before RLS (Stage D) can close them.",
+      why: "Three traps cost a round trip each and are worth writing down. A column-level REVOKE silently does nothing against a role holding a table-level grant, and reports success. pgcrypto lives in the extensions schema, so pinning a SECURITY DEFINER function's search_path to public alone breaks crypt() — and breaks it on the happy path only, so validation smoke tests still pass. And re-running a corrected migration through a saved query in the SQL editor silently re-applies the old text, which is why what actually landed was checked in pg_proc rather than assumed.",
+      date: "17 Aug 2026"
     }
   ];
   </script>
