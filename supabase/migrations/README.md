@@ -40,7 +40,7 @@ which folder.
 Verified by probing with the publishable key and no session, not by trusting the
 SQL editor's success message.
 
-### `migrations/` — production (`vuvvzzktrxydfxgxugke`)
+### `migrations/` — `osmica-production` (`vuvvzzktrxydfxgxugke`)
 
 | | file | state |
 |---|---|---|
@@ -54,7 +54,7 @@ SQL editor's success message.
 | 008 | drop insecure set_waiter_pin | ✅ applied |
 | 009 | rate limit both PIN oracles | ✅ applied |
 | 010 | rotate leaked credentials | ✅ applied |
-| 011 | revoke residual privileges | ❌ not yet run |
+| 011 | revoke residual privileges | ✅ applied 17 Aug — mark_invite_joined confirmed gone on both |
 
 ### `migrations/dev/` — osmica-dev (`simavghwjnqytcyeunto`)
 
