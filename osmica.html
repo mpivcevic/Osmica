@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.34</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.35</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1853,23 +1853,30 @@ async function handleInviteKey(k) {
     }
     // Set PIN
     _inviteVerifying = true;
-    const { data: pinSet, error } = await sb.rpc('set_waiter_pin', {
-      p_waiter_id: _inviteWaiter.id,
+    // PIN setup is keyed on the invite token: that token is the one credential a
+    // first-time waiter holds, and the function checks it server-side. It also
+    // marks the invite joined in the same statement, so mark_invite_joined is no
+    // longer a separate call — the PIN and the joined flag now land together.
+    const { data: pinResult, error } = await sb.rpc('set_waiter_pin_by_token', {
+      p_token: _inviteToken,
       p_pin: _invitePinBuf,
     });
     _inviteVerifying = false;
-    if (error) { err.textContent = 'Greška. Pokušaj ponovo.'; _invitePinBuf = ''; renderInviteDots([]); return; }
-    if (!pinSet) {
-      err.textContent = 'Ovaj PIN je već zauzet. Odaberi drugi.';
+    const restartPinSetup = (msg) => {
+      err.textContent = msg;
       _invitePinBuf = ''; _invitePinFirst = ''; _inviteStep = 'setup';
       document.getElementById('invite-confirm-label').style.display = 'none';
       document.getElementById('invite-instruction').textContent = 'Postavi 4-znamenkasti PIN za prijavu.';
-      renderInviteDots([]); return;
+      renderInviteDots([]);
+    };
+    if (error) { err.textContent = 'Greška. Pokušaj ponovo.'; _invitePinBuf = ''; renderInviteDots([]); return; }
+    if (pinResult === 'taken') { restartPinSetup('Ovaj PIN je već zauzet. Odaberi drugi.'); return; }
+    if (pinResult === 'invalid_pin') { restartPinSetup('PIN mora imati 4 znamenke.'); return; }
+    if (pinResult !== 'ok') {
+      // invalid_token — bad link, or one that has already been used to set a PIN.
+      restartPinSetup('Ova poveznica više ne vrijedi. Zatraži novu od vlasnika.');
+      return;
     }
-    // Was a bare anonymous UPDATE, which migration 003 revokes. The function is
-    // token-keyed and only ever sets joined_at once, so a passer-by cannot flip
-    // someone else's row to "joined" and lock them out of PIN setup.
-    await sb.rpc('mark_invite_joined', { p_token: _inviteToken });
     localStorage.setItem('zm_b_cafe_id', _inviteWaiter.cafe_id);
     const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
     setWaiterSession(session);
