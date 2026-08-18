@@ -55,7 +55,7 @@ SQL editor's success message.
 | 009 | rate limit both PIN oracles | ✅ applied |
 | 010 | rotate leaked credentials | ✅ applied |
 | 011 | revoke residual privileges | ✅ applied 17 Aug — mark_invite_joined confirmed gone on both |
-| 014 | Stage C1: waiter identity (`auth_user_id`, `link_waiter_to_auth`) | ❌ **not run** — additive; needs Anonymous sign-ins enabled first |
+| 014 | Stage C1: waiter identity (`auth_user_id`, `link_waiter_to_auth`) | ✅ applied 18 Aug — **both projects**; six production rows verified `auth_user_id` null |
 
 ### `migrations/dev/` — osmica-dev (`simavghwjnqytcyeunto`)
 
