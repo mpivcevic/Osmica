@@ -10,8 +10,8 @@ commit message.
 **One shared counter across both databases. Never reuse a number.**
 
 The next migration takes the next free number regardless of which project it
-targets. As of 17 Aug 2026 the high-water mark is `014`, so the next file —
-production or dev — is `015`.
+targets. As of 19 Aug 2026 the high-water mark is `015`, so the next file —
+production or dev — is `016`.
 
 Production's sequence will therefore have gaps. That is expected: a gap means
 that number went to dev.
@@ -56,6 +56,7 @@ SQL editor's success message.
 | 010 | rotate leaked credentials | ✅ applied |
 | 011 | revoke residual privileges | ✅ applied 17 Aug — mark_invite_joined confirmed gone on both |
 | 014 | Stage C1: waiter identity (`auth_user_id`, `link_waiter_to_auth`) | ✅ applied 18 Aug — **both projects**; six production rows verified `auth_user_id` null |
+| 015 | scope the `authenticated` role: RLS + column grants | ❌ **not run** — needs v4.38 client; apply before production gets anonymous sign-ins |
 
 ### `migrations/dev/` — osmica-dev (`simavghwjnqytcyeunto`)
 
@@ -66,8 +67,8 @@ SQL editor's success message.
 | 012 | token-keyed set_waiter_pin (dev variant) | ✅ applied |
 | 013 | align dev with production | ✅ applied |
 
-Production's `009`, `011` and `014` are also run against dev — they are not
-dev-specific, so they get no dev-numbered file.
+Production's `009`, `011`, `014` and `015` are also run against dev — they are
+not dev-specific, so they get no dev-numbered file.
 
 ## Two files that are kept on purpose despite never being run
 
@@ -107,6 +108,16 @@ Both are more useful as worked examples than they would be deleted.
    arrive from Supabase's `GRANT ALL` on new tables, never appear in application
    code, and survived `003`. `TRUNCATE` also **ignores RLS**, so it must be gone
    before Stage D or the policies are bypassable. See `011`.
+
+6. **A role is not an identity.** Every migration up to `011` narrowed `anon`
+   and left `authenticated` untouched, which was correct only while the owner's
+   password was the sole way to obtain that role. Enabling anonymous sign-ins
+   made it self-service, and every grant written for "the owner" silently became
+   a grant to anybody. Before enabling any new auth method, re-read what the
+   roles it hands out already carry. See `015`.
+7. **RLS cannot hide a column.** Policies filter rows; a session that can read
+   a row reads every column it holds a grant for. Sensitive columns need the
+   grant removed and a `SECURITY DEFINER` accessor, not a policy.
 
 ## Verifying anything
 
