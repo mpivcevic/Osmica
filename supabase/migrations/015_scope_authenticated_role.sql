@@ -119,7 +119,11 @@ RETURNS TABLE (
   joined_at    timestamptz,
   created_at   timestamptz,
   phone        text,
-  invite_token uuid
+  -- text, not uuid. dev/013 aligned dev to production by changing this column
+  -- uuid -> text, and 014 writes gen_random_uuid()::text into it. Declaring uuid
+  -- here compiles fine and fails only when the function is first called, with a
+  -- structure mismatch.
+  invite_token text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER

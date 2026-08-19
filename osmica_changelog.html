@@ -1244,6 +1244,28 @@
       body: "Migrations 001–010 are applied to production and verified by probing with the publishable key and no session, rather than by trusting the SQL editor's success message. Anonymous INSERT, UPDATE and DELETE are blocked on all four tables. Anonymous reads of pin_hash, invite_token, phone and select=* on waiters are blocked. Both PIN entry points are rate-limited with an escalating, decaying lockout — ten wrong guesses costs a minute, thirty costs fifteen — and the helper functions that drive it are not callable by anon, which an earlier draft of that migration would have left exposed. Every invite token was reissued and every PIN cleared, since both had been world-readable for months and must be assumed known. Still open: anonymous reads of names, colours, shift patterns and schedules, which need waiter identity (Stage C) before RLS (Stage D) can close them.",
       why: "Three traps cost a round trip each and are worth writing down. A column-level REVOKE silently does nothing against a role holding a table-level grant, and reports success. pgcrypto lives in the extensions schema, so pinning a SECURITY DEFINER function's search_path to public alone breaks crypt() — and breaks it on the happy path only, so validation smoke tests still pass. And re-running a corrected migration through a saved query in the SQL editor silently re-applies the old text, which is why what actually landed was checked in pg_proc rather than assumed.",
       date: "17 Aug 2026"
+    },
+    {
+      id: "build-4-37-waiter-identity",
+      phase: "build",
+      version: "Build 4.37",
+      versionDate: "19 Aug 2026",
+      tag: "fix",
+      title: "Waiters get a real identity instead of proving themselves with a PIN",
+      body: "Completing an invite now signs the waiter in anonymously and binds that Supabase user to their staff row through link_waiter_to_auth(token), which reads the caller's identity from their signed JWT rather than accepting it as an argument. The invite token is rotated in the same statement, so a forwarded invite link is inert the moment the real waiter uses it. Existing waiters are unaffected and keep logging in with their PIN; they gain an identity only when they next complete an invite. Verified on dev: the binding lands, and reopening the app puts the waiter on the waiter screen.",
+      why: "Without an auth.uid() there is nothing for a row-level security policy to key on, so this is the prerequisite for closing the remaining anonymous reads rather than a fix in itself. The sharp edge was that the app routed any Supabase session into the owner's admin panel, and after this change a waiter has one — an anonymous session. A guard on the is_anonymous claim ships with it, and the test that a linked waiter lands on the waiter screen rather than the owner's view is the one that had to pass before anything else.",
+      date: "19 Aug 2026"
+    },
+    {
+      id: "build-4-38-owner-reads-via-rpc",
+      phase: "build",
+      version: "Build 4.38",
+      versionDate: "19 Aug 2026",
+      tag: "fix",
+      title: "Being signed in no longer means being the owner",
+      body: "Phone numbers and invite tokens are no longer readable by holding the authenticated role. The owner's staff list now goes through owner_list_waiters(cafe_id), which verifies the caller actually owns that cafe before returning anything, and row-level security is enabled on all four tables with policies that separate an owner session from a waiter's. Adding a member takes one extra round trip, because the insert can only return columns the role may read and the invite link now comes from the ownership-checked call.",
+      why: "Every hardening migration so far narrowed the anonymous role and deliberately left authenticated alone, which was correct while the owner's password was the only way to obtain it. Enabling anonymous sign-ins for waiter identity made that role self-service, so grants written for the owner briefly applied to anyone. Two lessons worth keeping: a role is not an identity, so check what a role already carries before enabling any new way to obtain it; and row-level security filters rows but cannot hide a column, so sensitive columns need the grant removed and a checked accessor, not a policy.",
+      date: "19 Aug 2026"
     }
   ];
   </script>

@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.37</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.38</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1137,7 +1137,14 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 //                 invite, edit form, schedule-notify buttons) — no waiter-facing
 //                 screen shows another waiter's number
 const WAITER_COLS = 'id,cafe_id,name,color,pattern,vacations,joined_at,created_at';
-const WAITER_COLS_ADMIN = `${WAITER_COLS},phone,invite_token`;
+// No WAITER_COLS_ADMIN any more. Since 015, phone and invite_token are not in
+// the authenticated role's table grant at all, so no select list can reach them
+// — the owner goes through owner_list_waiters(), which checks cafe ownership
+// rather than trusting the role. Adding those columns back to a .select() here
+// returns 401 for everyone, owner included.
+async function fetchWaitersAsOwner(cafe_id) {
+  return sb.rpc('owner_list_waiters', { p_cafe_id: cafe_id });
+}
 
 // ══════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1329,7 +1336,9 @@ function buildDateSchedule(rows) {
 // it gets a 401 on the whole roster.
 async function loadAppData(cafe_id, asOwner = false) {
   const [wRes, rRes, sRes] = await Promise.all([
-    sb.from('waiters').select(asOwner ? WAITER_COLS_ADMIN : WAITER_COLS).eq('cafe_id', cafe_id).order('created_at'),
+    asOwner
+      ? fetchWaitersAsOwner(cafe_id)
+      : sb.from('waiters').select(WAITER_COLS).eq('cafe_id', cafe_id).order('created_at'),
     sb.from('shift_requests').select('*').eq('cafe_id', cafe_id),
     sb.from('date_schedules').select('*').eq('cafe_id', cafe_id),
   ]);
@@ -2140,9 +2149,10 @@ function switchTab(tab, dir) {
 
 function refreshWaiters() {
   if (!STATE.cafe?.id) return;
-  // Admin list only — the owner is authenticated here, so invite_token is
-  // legitimately theirs to read for their own café.
-  sb.from('waiters').select(WAITER_COLS_ADMIN).eq('cafe_id', STATE.cafe.id).order('created_at')
+  // Admin list only. Being authenticated is no longer sufficient to read
+  // invite_token — since anonymous sign-ins, that role is obtainable by anyone —
+  // so this goes through the RPC, which verifies the caller owns this café.
+  fetchWaitersAsOwner(STATE.cafe.id)
     .then(({ data }) => { if (data) { STATE.waiters = data.map(mapWaiter); renderAdminStaff(); } });
 }
 
@@ -2975,13 +2985,29 @@ async function saveWaiter() {
     renderAdminStaff();
   } else {
     const color = AVATAR_COLORS[STATE.waiters.length % AVATAR_COLORS.length];
+    // The INSERT can only return columns the role may SELECT, and since 015 that
+    // excludes invite_token — so the returning clause gets the safe list and the
+    // token comes from the ownership-checked RPC on a second call. One extra
+    // round trip, but no second way to read a token.
     const { data, error } = await sb.from('waiters').insert({
       cafe_id: STATE.cafe.id,
       name, phone, color, pattern,
-    }).select(WAITER_COLS_ADMIN).single();
+    }).select(WAITER_COLS).single();
+    if (error) { btn.disabled = false; showToast('Greška pri dodavanju.'); return; }
+
+    const { data: rows, error: fetchErr } = await fetchWaitersAsOwner(STATE.cafe.id);
     btn.disabled = false;
-    if (error) { showToast('Greška pri dodavanju.'); return; }
-    const newWaiter = mapWaiter(data);
+    const row = (rows || []).find(r => r.id === data.id);
+    if (fetchErr || !row) {
+      // The member exists; only the invite link is missing. Say so precisely,
+      // because "Greška pri dodavanju" would send the owner back to add a
+      // duplicate.
+      showToast('Član dodan, ali link nije dohvaćen. Otvori popis osoblja.');
+      renderAdminStaff();
+      closeWaiterModal();
+      return;
+    }
+    const newWaiter = mapWaiter(row);
     STATE.waiters.push(newWaiter);
     showToast('Član dodan ✓');
     // Show invite link
