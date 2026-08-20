@@ -1,5 +1,6 @@
 # Tooling scratch — logs and session state, not project files
 .gstack/
+.claude/
 
 # Editor/workspace config
 *.code-workspace
