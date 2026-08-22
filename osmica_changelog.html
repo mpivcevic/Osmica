@@ -1266,6 +1266,17 @@
       body: "Phone numbers and invite tokens are no longer readable by holding the authenticated role. The owner's staff list now goes through owner_list_waiters(cafe_id), which verifies the caller actually owns that cafe before returning anything, and row-level security is enabled on all four tables with policies that separate an owner session from a waiter's. Adding a member takes one extra round trip, because the insert can only return columns the role may read and the invite link now comes from the ownership-checked call.",
       why: "Every hardening migration so far narrowed the anonymous role and deliberately left authenticated alone, which was correct while the owner's password was the only way to obtain it. Enabling anonymous sign-ins for waiter identity made that role self-service, so grants written for the owner briefly applied to anyone. Two lessons worth keeping: a role is not an identity, so check what a role already carries before enabling any new way to obtain it; and row-level security filters rows but cannot hide a column, so sensitive columns need the grant removed and a checked accessor, not a policy.",
       date: "19 Aug 2026"
+    },
+    {
+      id: "build-4-39-recover-branch-links",
+      phase: "build",
+      version: "Build 4.39",
+      versionDate: "22 Aug 2026",
+      tag: "fix",
+      title: "Returning waiters get an identity too, not just brand-new ones",
+      body: "Completing an invite now binds the waiter to their staff row whether they are setting a PIN for the first time or entering an existing one. Until this build only the first-time path did that, and the invite screen chooses between the two on whether the waiter has ever joined — a flag that is set the moment anyone picks a PIN and is never cleared. So every waiter past their first login took the path that skipped linking, and no number of reissued invites could give them an identity. The failure was invisible: the link opened, the PIN was accepted, the roster loaded, and the app worked in every respect except raising a swap request or offering to cover, which failed with a generic error. A waiter still bound to a device they no longer have is not covered by this and needs the owner to release the old binding first.",
+      why: "The whole point of Stage C is that a waiter's identity, not their knowledge of a PIN, is what authorises a write — so as soon as row-level security started depending on that identity, a waiter without one became silently read-only rather than merely unlinked. Two things made it hard to see. Nothing in the admin panel distinguishes a waiter who has joined from one who is actually linked, so the roster looked complete; and the app shows one generic error for every failed write, so a correctly-enforced policy and a broken app read identically on screen. Worth keeping: when a refusal is the expected result, confirm it by its status code rather than by the message on screen, and never let a status column stand in for the property you actually care about.",
+      date: "22 Aug 2026"
     }
   ];
   </script>

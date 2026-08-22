@@ -10,8 +10,8 @@ commit message.
 **One shared counter across both databases. Never reuse a number.**
 
 The next migration takes the next free number regardless of which project it
-targets. As of 19 Aug 2026 the high-water mark is `015`, so the next file —
-production or dev — is `016`.
+targets. As of 22 Aug 2026 the high-water mark is `dev/016`, so the next file —
+production or dev — is `017`.
 
 Production's sequence will therefore have gaps. That is expected: a gap means
 that number went to dev.
@@ -56,7 +56,7 @@ SQL editor's success message.
 | 010 | rotate leaked credentials | ✅ applied |
 | 011 | revoke residual privileges | ✅ applied 17 Aug — mark_invite_joined confirmed gone on both |
 | 014 | Stage C1: waiter identity (`auth_user_id`, `link_waiter_to_auth`) | ✅ applied 18 Aug — **both projects**; six production rows verified `auth_user_id` null |
-| 015 | scope the `authenticated` role: RLS + column grants | ❌ **not run** — needs v4.38 client; apply before production gets anonymous sign-ins |
+| 015 | scope the `authenticated` role: RLS + column grants | ✅ applied 19 Aug — **both projects**, alongside the v4.38 deploy |
 
 ### `migrations/dev/` — osmica-dev (`simavghwjnqytcyeunto`)
 
@@ -65,10 +65,15 @@ SQL editor's success message.
 | 010 | dev schema | ✅ applied |
 | 011 | dev seed | ✅ applied |
 | 012 | token-keyed set_waiter_pin (dev variant) | ✅ applied |
-| 013 | align dev with production | ✅ applied |
+| 013 | align dev with production | ✅ applied — reads and constraints only; **declined `003` on purpose**, see its line 15 |
+| 016 | align dev's writes with production | ✅ applied 22 Aug — drops `dev_open_*`, replays `003`'s revokes |
 
 Production's `009`, `011`, `014` and `015` are also run against dev — they are
-not dev-specific, so they get no dev-numbered file.
+not dev-specific, so they get no dev-numbered file. **`003` was never run on
+dev**; `dev/016` replays it instead, and is the file to read for why the
+divergence was deliberate and why it stopped being defensible.
+
+High-water mark is now `016`. The next file, either project, is `017`.
 
 ## Two files that are kept on purpose despite never being run
 
@@ -118,6 +123,45 @@ Both are more useful as worked examples than they would be deleted.
 7. **RLS cannot hide a column.** Policies filter rows; a session that can read
    a row reads every column it holds a grant for. Sensitive columns need the
    grant removed and a `SECURITY DEFINER` accessor, not a policy.
+8. **A `204` from `PATCH` or `DELETE` under RLS means "no rows matched", not
+   "it worked".** The two are indistinguishable from the status code alone. On
+   22 Aug an anonymous session sent `PATCH /cafes?id=eq.<the real café>` with
+   `{"name":"pwned"}` and got `204` — which reads as a successful takeover and
+   was in fact `cafes_owner_all` filtering the row away. Always add
+   `Prefer: return=representation`: `[]` is proof that nothing was touched, and
+   a returned row is proof that something was. `003`'s header hit the same trap
+   from the other side, where the filter matched no rows *and* the write was
+   permitted.
+9. **A permissive policy cannot be narrowed by adding another policy.**
+   Permissive policies combine with **OR**, so one blanket
+   `FOR ALL USING (true)` makes every other policy on that table irrelevant. Dev
+   carried `dev_open_*` from `dev/010` alongside `015`'s ten scoped policies for
+   three days; `015` was inert there the whole time and its browser tests passed
+   for the wrong reason. Before trusting any policy, list what else is on the
+   table: `select tablename, policyname, roles, cmd from pg_policies where
+   schemaname = 'public';` See `dev/016`.
+10. **A migration's name is not its coverage.** `dev/013` is called "align dev
+   with production" and aligns reads, constraints and triggers — not writes,
+   which it declines on purpose in a comment at line 15. Read what a migration
+   does, not what it is called.
+11. **The admin panel's "activated" is `joined_at`, not `auth_user_id`.** A
+   waiter who set a PIN shows as activated forever; whether they can *write*
+   depends on `auth_user_id`, which the panel never displays. On 22 Aug five dev
+   waiters read as activated and none of them could raise a swap request. Any
+   question about who can write is answered by SQL, never by the UI:
+   `select name, joined_at is not null as activated, auth_user_id is not null as
+   linked from public.waiters order by name;`
+12. **When a refusal is the expected result, one generic error toast is not
+   evidence.** The client shows the same *"Greška. Pokušajte ponovo."* for a
+   correctly-enforced policy and for a broken app. Distinguish them by the
+   status: 403 `new row violates row-level security policy` is the policy
+   working, 401 `42501` means the caller was `anon` and never reached it.
+13. **`already_linked` and "this waiter is already linked" are different
+   things.** `link_waiter_to_auth` returns `already_linked` only when the
+   *caller's* uid is bound (`014:57-63`). A waiter whose row is bound, arriving
+   from a new browser, returns `invalid_token` instead — and the client counts
+   only `ok`/`already_linked` as success, so recovery fails with nothing but a
+   console warning. Clearing `auth_user_id` is what makes a row claimable again.
 
 ## Verifying anything
 

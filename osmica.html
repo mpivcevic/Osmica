@@ -569,7 +569,7 @@ details[open] .hours-chevron::before{content:'▴';}
 <div id="screen-login" class="screen">
   <div class="login-logo"><svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#logo-mark"/></svg><span>Osmica</span></div>
   <p class="login-tagline">Tvoje smjene, tvoja pravila.</p>
-  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.38</p>
+  <p style="font-size:10px;color:var(--text-3);margin-top:-24px;margin-bottom:clamp(14px,2.5dvh,24px);">v4.39</p>
   <!-- waiter session: show name + PIN keypad -->
   <div id="login-waiter-section" style="display:none;width:100%;flex-direction:column;align-items:center;">
     <div class="login-name-display">
@@ -1987,6 +1987,26 @@ async function handleInviteKey(k) {
       localStorage.setItem('zm_b_cafe_id', _inviteWaiter.cafe_id);
       const session = {id: _inviteWaiter.id, name: _inviteWaiter.name, cafe_id: _inviteWaiter.cafe_id, color: _inviteWaiter.color || AVATAR_COLORS[0]};
       setWaiterSession(session);
+      // v4.39: link here too, not only in the setup branch above.
+      //
+      // This branch was the only way a returning waiter could arrive, because
+      // handleInviteLoad routes on !waiter.joined_at and joined_at is never
+      // cleared once set_waiter_pin_by_token has written it. So every waiter who
+      // had ever chosen a PIN landed here forever and could never be given an
+      // auth.uid() through the UI — they entered the app as `anon` and were
+      // silently read-only, which since 015 means unable to raise a swap or
+      // offer to cover. It looked like working software: the invite opened, the
+      // PIN was accepted, the roster loaded.
+      //
+      // Same contract as the setup branch: deliberately non-fatal, because the
+      // waiter is already through the door by this point and a failed link
+      // should degrade to read-only rather than lock them out.
+      //
+      // Does not help a waiter already bound to a device they no longer have —
+      // link_waiter_to_auth requires auth_user_id IS NULL (014:71) and returns
+      // invalid_token otherwise. That needs an owner-facing unlink; see
+      // decision 2 in TaskList_2026-08-17.md.
+      await linkWaiterIdentity(_inviteToken);
       history.replaceState({}, '', location.pathname);
       proceedAfterWaiterAuth(session);
     } else {
