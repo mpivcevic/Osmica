@@ -1,5 +1,23 @@
 # Osmica — Security Plan
 
+> ⚠️ **Read this first — written 13 Aug 2026 and now partly historical.**
+> This is the *plan*, not the *status*. Section 1 ("What is actually true right
+> now") describes the world before any migration was applied: it says anonymous
+> writes are open on all four tables and lists five waiters. None of that is
+> still true. Stages A, B and C1-C2 are complete and verified on both projects.
+>
+> For current state, in this order:
+> 1. `TaskList_2026-08-17.md` — the Stage C record, closed 22 Aug 2026
+> 2. `osmica_stage_c_plan.md` — C3 and C4 scope, not yet built
+> 3. `supabase/migrations/README.md` — what is applied where, and the trap list
+>
+> **Stage D is narrower than described below.** Migration `015` already enabled
+> RLS on all four tables and wrote the owner and waiter policies. What remains is
+> the four `*_read` policies, which are deliberately `TO anon, authenticated
+> USING (true)`, and the residual anon SELECT grants — and closing them properly
+> depends on C4 removing the PIN login path, because until then a waiter with no
+> session still has to render the café and roster before authenticating.
+
 Written 13 Aug 2026. Supersedes the deferred backlog from 10 Aug.
 All findings below were re-probed live against the production project today,
 read-only except two write probes whose filters matched zero rows.
